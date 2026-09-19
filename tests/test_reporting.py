@@ -1,4 +1,6 @@
 import shutil
+import subprocess
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +12,20 @@ from portfolio_forecast.reporting import compile_statistical_reports
 from portfolio_forecast.reporting.pdf import _escape, _number, _slug
 
 needs_latex = pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+
+
+@pytest.fixture
+def latex_source(monkeypatch):
+    """Record the LaTeX source each compile_statistical_reports call typesets."""
+    sources = []
+    run = subprocess.run
+
+    def recording_run(args, cwd, **kwargs):
+        sources.append((Path(cwd) / "report.tex").read_text())
+        return run(args, cwd=cwd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", recording_run)
+    return sources
 
 
 @pytest.fixture
@@ -114,6 +130,16 @@ class TestCompile:
         compile_statistical_reports(spec, output_dir=tmp_path)
         assert plt.fignum_exists(fig.number)
         assert tuple(fig.get_size_inches()) == size
+
+    def test_no_table_of_contents_by_default(self, spec, sims, tmp_path, latex_source):
+        spec["Reports"]["Report 2"] = {"Results": statistical_report(sims, "1 day")}
+        compile_statistical_reports(spec, output_dir=tmp_path)
+        assert r"\tableofcontents" not in latex_source[-1]
+
+    def test_table_of_contents_follows_the_introduction(self, spec, tmp_path, latex_source):
+        compile_statistical_reports(spec, output_dir=tmp_path, table_of_contents=True)
+        tex = latex_source[-1]
+        assert tex.index("An introduction.") < tex.index(r"\tableofcontents") < tex.index(r"\section{")
 
     def test_latex_failure_reports_the_log_and_writes_nothing(self, spec, tmp_path):
         # pdflatex has no glyph for an emoji

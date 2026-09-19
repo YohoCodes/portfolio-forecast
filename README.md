@@ -5,10 +5,10 @@ strategy. Give it a price or portfolio-value history and it simulates
 thousands of possible future paths by three methods: resampling past returns,
 drawing from a fitted distribution, or switching between fitted market
 regimes. It then summarizes the spread of outcomes (returns, risk and tail
-risk, with confidence intervals), draws them as fan charts, and typesets
-the results as a PDF report. It also
-includes backtests for buy-and-hold and scheduled-rebalancing portfolios, and
-a performance report for a single historical series.
+risk, with confidence intervals), draws them as fan charts, and typesets the
+results as a PDF report. It also includes backtests for buy-and-hold and
+scheduled-rebalancing portfolios, and a performance report for a single
+historical series.
 
 ## Table of contents
 
@@ -78,9 +78,11 @@ For local development, from the repo root:
 pip install -e ".[notebook]"
 ```
 
-The `notebook` extra adds `ipykernel` and `yfinance` for `sandbox.ipynb`, a
-worked example of all three simulators on ten years of daily AAPL prices from
-Yahoo Finance.
+The `notebook` extra adds `ipykernel` and `yfinance` for `demo.ipynb`, a worked
+example on ten years of daily AAPL prices from Yahoo Finance: it runs all
+three simulators, plots and compares their paths, prints their statistical
+reports, and compiles a PDF report of the parametric and regime-switching
+results (this last step needs LaTeX).
 
 To run the tests (no network access needed; the PDF tests are skipped
 without `pdflatex`):
@@ -103,8 +105,9 @@ from portfolio_forecast.plotting import plot_simulated_paths
 from portfolio_forecast.reporting import compile_statistical_reports
 from portfolio_forecast.utils import next_trading_dates
 
-# Ten years of daily closes: a date-indexed frame with one column
-prices = yf.download("AAPL", period="10y", auto_adjust=True, progress=False)["Close"]
+# Ten years of daily closes: a date-indexed frame with one column. dropna
+# removes a trailing row with no close, which Yahoo can return mid-session.
+prices = yf.download("AAPL", period="10y", auto_adjust=True, progress=False)["Close"].dropna()
 
 # 1,000 paths of the next 100 trading days, seeded for reproducibility
 sims = nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=42)
@@ -145,7 +148,8 @@ package.
 | `src/portfolio_forecast/reporting/pdf.py` | PDF reports: [`compile_statistical_reports`](#compile_statistical_reports) |
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
-| `sandbox.ipynb` | Worked example of all three simulators, their plots and reports |
+| `tests/` | `pytest` suite covering every subpackage |
+| `demo.ipynb` | Worked example: all three simulators, their plots and statistical reports, and a PDF report |
 
 Each subpackage re-exports its public functions, e.g.
 `from portfolio_forecast.performance import statistical_report`.
@@ -165,6 +169,7 @@ What the simulators take as history.
 | Type | `pandas.Series` or single-column `pandas.DataFrame` |
 | Rows | One per bar, oldest first; the bar size is the simulated period |
 | Values | Prices or portfolio values; positive for [`regime_switching_monte_carlo`](#regime_switching_monte_carlo) (log returns) |
+| Missing values | None; drop them first (e.g. `.dropna()`), or a trailing row with no price starts the simulation from a date with no close |
 
 ### `sims` array
 
@@ -583,12 +588,13 @@ color scale, so heights and colors compare directly across panels.
 #### `compile_statistical_reports`
 
 ```python
-compile_statistical_reports(spec, output_dir='Reporting', filename=None, engine='pdflatex')
+compile_statistical_reports(spec, output_dir='Reporting', filename=None, engine='pdflatex',
+                            table_of_contents=False)
 ```
 
 Typeset a [report dictionary](#report-dictionary) as a PDF with LaTeX: the
-title, date and introduction, a table of contents when there is more than one
-report, then a section per report with its description, its results as tables
+title, date and introduction, an optional table of contents, then a section
+per report with its description, its results as tables
 (simulation setup, returns, risk, tail risk) and its figures. LaTeX runs in a
 temporary directory, so the PDF is the only file written.
 
@@ -600,6 +606,7 @@ temporary directory, so the PDF is the only file written.
 | `output_dir` | `str` or path | `'Reporting'` | Directory for the PDF, created if missing; relative to the working directory, normally the project folder. |
 | `filename` | `str` | `None` | PDF name; defaults to the title with non-alphanumeric runs replaced by `_` (`Generic_Title.pdf`). `.pdf` is added if missing. An existing file of that name is replaced. |
 | `engine` | `str` | `'pdflatex'` | LaTeX engine; `xelatex` and `lualatex` also work. |
+| `table_of_contents` | `bool` | `False` | List the reports with page numbers after the introduction, each linked to its section. |
 
 **Returns** — `pathlib.Path`, the absolute path of the PDF.
 

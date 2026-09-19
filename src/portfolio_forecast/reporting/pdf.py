@@ -163,11 +163,12 @@ def _validate(spec):
                 )
 
 
-def compile_statistical_reports(spec, output_dir="Reporting", filename=None, engine="pdflatex"):
+def compile_statistical_reports(spec, output_dir="Reporting", filename=None, engine="pdflatex",
+                                table_of_contents=False):
     """Typeset statistical reports and their figures as a PDF, using LaTeX.
 
     Builds one document from a report dictionary: a title and introduction,
-    then a section per report with its description, tables of the
+    an optional table of contents, then a section per report with its description, tables of the
     `statistical_report` results and its figures. LaTeX runs in a temporary
     directory, so the PDF is the only file written.
 
@@ -207,6 +208,9 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         of the same name is replaced.
     engine : str, default 'pdflatex'
         LaTeX engine to run; ``xelatex`` or ``lualatex`` also work.
+    table_of_contents : bool, default False
+        If True, list the reports with their page numbers after the
+        introduction. Each entry links to its section.
 
     Returns
     -------
@@ -244,7 +248,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
     ...         "Results": results,
     ...         "Figures": {"Paths": {"Image": fig, "Caption": "1,000 simulated paths."}},
     ...     }},
-    ... })
+    ... }, table_of_contents=True)
     PosixPath('/path/to/project/Reporting/AAPL_100_Day_Outlook.pdf')
     """
     _validate(spec)
@@ -267,7 +271,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         intro = _escape(spec.get("Introduction") or "")
         if intro:
             body.append(intro)
-        if len(spec["Reports"]) > 1:
+        if table_of_contents:
             body.append(r"\tableofcontents")
 
         n_figure = 0
