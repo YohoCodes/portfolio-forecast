@@ -1,5 +1,6 @@
 import datetime as dt
 import math
+import numbers
 import re
 import shutil
 import subprocess
@@ -161,6 +162,17 @@ def _validate(spec):
                     f'figure {fig_name!r} in report {name!r} needs a matplotlib Figure as "Image", '
                     f"got {type(image).__name__}"
                 )
+            width = figure.get("Width", 1.0)
+            if not isinstance(width, numbers.Real) or isinstance(width, bool):
+                raise TypeError(
+                    f'figure {fig_name!r} in report {name!r} needs a number as "Width", '
+                    f"got {type(width).__name__}"
+                )
+            if not 0 < width <= 1:
+                raise ValueError(
+                    f'figure {fig_name!r} in report {name!r} has "Width" {width!r}; it is a share of '
+                    "the text width, so it must be greater than 0 and at most 1"
+                )
 
 
 def compile_statistical_reports(spec, output_dir="Reporting", filename=None, engine="pdflatex",
@@ -168,9 +180,9 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
     """Typeset statistical reports and their figures as a PDF, using LaTeX.
 
     Builds one document from a report dictionary: a title and introduction,
-    an optional table of contents, then a section per report with its description, tables of the
-    `statistical_report` results and its figures. LaTeX runs in a temporary
-    directory, so the PDF is the only file written.
+    an optional table of contents, then a section per report with its
+    description, tables of the `statistical_report` results and its figures.
+    LaTeX runs in a temporary directory, so the PDF is the only file written.
 
     Parameters
     ----------
@@ -185,7 +197,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
                         "Description": "Text before the report's tables.",
                         "Results": results,  # from statistical_report
                         "Figures": {
-                            "Fig1": {"Image": fig, "Caption": "..."},
+                            "Fig1": {"Image": fig, "Caption": "...", "Width": 0.8},
                         },
                     },
                 },
@@ -194,7 +206,9 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         ``"Title"`` and a non-empty ``"Reports"`` are required. Reports and
         figures appear in dictionary order. ``"Introduction"``,
         ``"Description"``, ``"Figures"`` and ``"Caption"`` may be empty or
-        left out. Text is typeset literally (LaTeX special characters such as
+        left out. ``"Width"`` is the figure's width as a share of the text
+        width, greater than 0 and at most 1 (the default, full width); the
+        figure is centered and keeps its aspect ratio. Text is typeset literally (LaTeX special characters such as
         ``%``, ``&`` and ``_`` are escaped), and a blank line starts a new
         paragraph. The figure keys (``"Fig1"``) only name the figures in
         error messages.
@@ -220,11 +234,12 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
     Raises
     ------
     TypeError
-        If `spec` is not a dict, or a figure's ``"Image"`` is not a
-        matplotlib Figure.
+        If `spec` is not a dict, a figure's ``"Image"`` is not a matplotlib
+        Figure, or its ``"Width"`` is not a number.
     ValueError
-        If ``"Title"`` or ``"Reports"`` is missing or empty, or a report's
-        ``"Results"`` is not a `statistical_report` result.
+        If ``"Title"`` or ``"Reports"`` is missing or empty, a report's
+        ``"Results"`` is not a `statistical_report` result, or a figure's
+        ``"Width"`` is not in (0, 1].
     RuntimeError
         If the LaTeX engine is not installed, or LaTeX fails to compile the
         document (the end of its log is included).
@@ -289,7 +304,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
                 caption = _escape(figure.get("Caption") or "")
                 section.append(
                     "\\begin{figure}[H]\n\\centering\n"
-                    f"\\includegraphics[width=\\linewidth]{{{image.name}}}\n"
+                    f"\\includegraphics[width={float(figure.get('Width', 1.0)):.4f}\\linewidth]{{{image.name}}}\n"
                     + (f"\\caption{{{caption}}}\n" if caption else "")
                     + "\\end{figure}"
                 )

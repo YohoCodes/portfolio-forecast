@@ -91,6 +91,17 @@ class TestValidation:
         with pytest.raises(TypeError, match="'Fig1' in report 'Report 1'"):
             compile_statistical_reports(spec)
 
+    @pytest.mark.parametrize("width, error, message", [
+        ("half", TypeError, "needs a number"),
+        (True, TypeError, "needs a number"),
+        (0, ValueError, "greater than 0 and at most 1"),
+        (1.5, ValueError, "greater than 0 and at most 1"),
+    ])
+    def test_width_must_be_a_share_of_the_text_width(self, spec, width, error, message):
+        spec["Reports"]["Report 1"]["Figures"]["Fig1"]["Width"] = width
+        with pytest.raises(error, match=message):
+            compile_statistical_reports(spec)
+
     def test_missing_engine_raises(self, spec, monkeypatch):
         monkeypatch.setattr(shutil, "which", lambda name: None)
         with pytest.raises(RuntimeError, match="pdflatex was not found"):
@@ -140,6 +151,19 @@ class TestCompile:
         compile_statistical_reports(spec, output_dir=tmp_path, table_of_contents=True)
         tex = latex_source[-1]
         assert tex.index("An introduction.") < tex.index(r"\tableofcontents") < tex.index(r"\section{")
+
+    def test_figures_are_full_width_by_default(self, spec, tmp_path, latex_source):
+        compile_statistical_reports(spec, output_dir=tmp_path)
+        assert r"\includegraphics[width=1.0000\linewidth]" in latex_source[-1]
+
+    @pytest.mark.parametrize("width, latex", [(0.8, "0.8000"), (np.float64(0.55), "0.5500"),
+                                              (1, "1.0000"), (0.00001, "0.0000")])
+    def test_width_sets_the_share_of_the_text_width(self, spec, tmp_path, latex_source, width, latex):
+        # A tiny width must not be written in scientific notation, which LaTeX rejects
+        spec["Reports"]["Report 1"]["Figures"]["Fig1"]["Width"] = width
+        pdf = compile_statistical_reports(spec, output_dir=tmp_path)
+        assert rf"\includegraphics[width={latex}\linewidth]" in latex_source[-1]
+        assert pdf.read_bytes().startswith(b"%PDF")
 
     def test_latex_failure_reports_the_log_and_writes_nothing(self, spec, tmp_path):
         # pdflatex has no glyph for an emoji

@@ -222,7 +222,7 @@ Reports and figures appear in the PDF in dictionary order.
             "Description": "",
             "Results": results1,
             "Figures": {
-                "Fig1": {"Image": fig1, "Caption": ""},
+                "Fig1": {"Image": fig1, "Caption": "", "Width": 1.0},
             },
         },
     },
@@ -239,6 +239,7 @@ Reports and figures appear in the PDF in dictionary order.
 | `"Figures"` | no | `dict` | Numbered figures; the keys only name them in error messages |
 | `"Image"` | yes, per figure | `matplotlib.figure.Figure` | The figure, embedded as vector graphics |
 | `"Caption"` | no | `str` | Caption under the figure |
+| `"Width"` | no | `float` | Figure width as a share of the text width, greater than 0 and at most 1; default `1.0` (full width). The figure is centered and keeps its aspect ratio |
 
 All text is printed literally: LaTeX special characters (`% & $ # _ { } ~ ^ \`)
 are escaped, and a blank line starts a new paragraph.
@@ -632,17 +633,19 @@ temporary directory, so the PDF is the only file written.
 
 **Returns** — `pathlib.Path`, the absolute path of the PDF.
 
-**Raises** — `TypeError` if `spec` is not a dict or an `"Image"` is not a
-matplotlib Figure. `ValueError` if `"Title"` or `"Reports"` is missing or
-empty, or a `"Results"` is not from `statistical_report`. `RuntimeError` if
+**Raises** — `TypeError` if `spec` is not a dict, an `"Image"` is not a
+matplotlib Figure, or a `"Width"` is not a number. `ValueError` if `"Title"`
+or `"Reports"` is missing or empty, a `"Results"` is not from
+`statistical_report`, or a `"Width"` is not in (0, 1]. `RuntimeError` if
 the engine is not installed, or LaTeX fails (the end of its log is included);
 nothing is written in either case.
 
 **Notes** — Needs the booktabs, caption, fancyhdr, float, geometry, hyperref,
 lmodern and microtype LaTeX packages, all part of TeX Live, MacTeX and MiKTeX.
 Figures are embedded as vector PDF and are not modified or closed; a figure
-is scaled to the text width, so a wide one (such as a three-panel
-[`plot_path_comparison`](#plot_path_comparison)) gets small labels. With
+is scaled to its `"Width"` share of the text width, so a wide one (such as a
+three-panel [`plot_path_comparison`](#plot_path_comparison)) gets small labels,
+and a narrower `"Width"` makes them smaller still. With
 `pdflatex`, text must use characters it can typeset (Latin scripts, common
 symbols); an emoji, for example, makes LaTeX fail.
 
