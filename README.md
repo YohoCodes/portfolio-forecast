@@ -60,7 +60,7 @@ return is the more meaningful figure.
 Requires Python 3.10 or later.
 
 ```bash
-pip install "git+https://github.com/YohoCodes/portfolio-forecast.git"
+pip install portfolio-forecast
 ```
 
 Dependencies: numpy, pandas, scipy, matplotlib, hmmlearn, exchange_calendars
