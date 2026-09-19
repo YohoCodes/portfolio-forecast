@@ -280,7 +280,8 @@ skew carry over; every draw is independent, so volatility clustering does not.
 #### `parametric_monte_carlo`
 
 ```python
-parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None)
+parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None,
+                       return_fit=False)
 ```
 
 Simulate future paths from a `scipy.stats` distribution fitted to historical
@@ -295,8 +296,17 @@ returns by maximum likelihood. Each path compounds independent draws.
 | `sim_length` | `int` | `100` | Future periods per path. |
 | `n_sims` | `int` | `1000` | Number of paths. |
 | `random_state` | `int`, `Generator` or `None` | `None` | As in [`nonparametric_monte_carlo`](#nonparametric_monte_carlo). |
+| `return_fit` | `bool` | `False` | Also return the fitted distribution. |
 
 **Returns** — A [`sims` array](#sims-array) of shape `(n_sims, sim_length + 1)`.
+With `return_fit=True`, a tuple `(sims, fit)`, where `fit` is a `dict`:
+
+| Key | Contents |
+| --- | --- |
+| `"Distribution"` | scipy.stats name of the distribution used, e.g. `'johnsonsu'` |
+| `"Parameters"` | Its fitted parameters by name: shape parameters, then `loc` and `scale` |
+| `"AIC"` | Its AIC, `2k - 2 log L` |
+| `"Candidates"` | Every candidate's AIC by name, lowest first, when `distribution=None`; otherwise `None` |
 
 **Notes** — With `distribution=None`, prints each candidate's AIC
 (`2k - 2 log L`) and the one selected. The fitted distribution is unbounded,
@@ -310,7 +320,7 @@ so a draw below −100% can send a path to zero or below;
 
 ```python
 regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_starts=10,
-                             sim_length=100, n_sims=1000, random_state=None)
+                             sim_length=100, n_sims=1000, random_state=None, return_fit=False)
 ```
 
 Fit a Gaussian hidden Markov model to log returns, each hidden regime having
@@ -330,19 +340,31 @@ clustering.
 | `sim_length` | `int` | `100` | Future periods per path. |
 | `n_sims` | `int` | `1000` | Number of paths. |
 | `random_state` | `int`, `Generator` or `None` | `None` | Seed or Generator for the restarts and the draws. |
+| `return_fit` | `bool` | `False` | Also return the fitted model. |
 
 **Returns** — A [`sims` array](#sims-array) of shape `(n_sims, sim_length + 1)`.
+With `return_fit=True`, a tuple `(sims, fit)`, where `fit` is a `dict`:
+
+| Key | Contents |
+| --- | --- |
+| `"Regime Count"` | Number of regimes used |
+| `"BIC"` | BIC by regime count: every count fitted when `n_regimes=None`, otherwise just `n_regimes` |
+| `"Log Likelihood"` | Log-likelihood of the model used |
+| `"Regimes"` | `DataFrame`, one row per regime from lowest to highest volatility: `Mean` and `Volatility` of the one-period log return, `Expected Duration` in periods (`1 / (1 - p_kk)`), and `Current Probability` of being in it at the last historical bar |
+| `"Transition Matrix"` | `DataFrame` of one-period transition probabilities, row regime to column regime, same order |
 
 **Raises** — `ValueError` if no restart gives a usable fit for `n_regimes`,
 or, with `n_regimes=None`, if none of 1, 2 or 3 regimes can be fitted.
 
-**Notes** — A restart is rejected if any parameter is non-finite or a regime
+**Notes** — Each regime is fitted by maximum likelihood (EM with no prior on
+the variances). A restart is rejected if any parameter is non-finite or a regime
 holds less than `max(2, 1% of the history)` of the expected occupancy. BIC is
 `-2 log L + p log n` with `p = (K-1) + K(K-1) + 2K` for K regimes; regime
 counts that cannot be fitted are skipped. With `bootstrap=True`, a regime with
 no historical returns falls back to its normal. Prints the BIC per regime count
 (when selecting), then each regime's mean, volatility and expected duration
-`1 / (1 - p_kk)`.
+`1 / (1 - p_kk)`, from lowest to highest volatility. The model numbers regimes
+arbitrarily; ordering them by volatility changes only how they are reported.
 
 **See also** — [`nonparametric_monte_carlo`](#nonparametric_monte_carlo),
 [`parametric_monte_carlo`](#parametric_monte_carlo).

@@ -2,6 +2,7 @@ import logging
 import warnings
 
 import numpy as np
+import pandas as pd
 from hmmlearn.hmm import GaussianHMM
 from scipy import stats
 
@@ -76,7 +77,8 @@ def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=
 
 
 
-def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None):
+def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None,
+                           return_fit=False):
     """Simulate future value paths from a distribution fitted to historical returns.
 
     One-period returns are fitted by maximum likelihood to a scipy.stats
@@ -99,13 +101,28 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
     random_state : int, numpy.random.Generator or None, default None
         Seed or Generator for the draws. An int or a Generator gives
         reproducible paths; None gives a fresh, unseeded Generator.
+    return_fit : bool, default False
+        If True, also return the fitted distribution; see Returns.
 
     Returns
     -------
-    numpy.ndarray
+    sims : numpy.ndarray
         Array of shape ``(n_sims, sim_length + 1)``, one path per row. Column
         0 is the starting value, 1.0, so every value is a growth multiple of
         the last historical price.
+    fit : dict
+        Only if `return_fit` is True:
+
+        ``"Distribution"``
+            scipy.stats name of the distribution used, e.g. ``'johnsonsu'``.
+        ``"Parameters"``
+            dict of its fitted parameters by name: the shape parameters
+            (e.g. ``a``, ``b``), then ``loc`` and ``scale``.
+        ``"AIC"``
+            Its AIC, ``2k - 2 log L``.
+        ``"Candidates"``
+            dict of every candidate's AIC by name when `distribution` is
+            None, lowest first; otherwise None.
 
     Notes
     -----
@@ -128,6 +145,9 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
     >>> from scipy import stats
     >>> sims = parametric_monte_carlo(prices, distribution=stats.t,
     ...                               random_state=42)
+    >>> sims, fit = parametric_monte_carlo(prices, random_state=42, return_fit=True)
+    >>> fit["Distribution"], fit["AIC"]
+    ('johnsonsu', -13480.71...)
     """
     rng = np.random.default_rng(random_state)
 
@@ -136,24 +156,28 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
 
     data = returns.to_numpy().flatten()
 
+    def aic(dist, dist_params):
+        # AIC = 2k - 2*log-likelihood
+        return 2 * len(dist_params) - 2 * np.sum(dist.logpdf(data, *dist_params))
+
     if distribution is None:
-        # Fitting each candidate via MLE and scoring it with AIC = 2k - 2*log-likelihood
+        # Fitting each candidate via MLE and scoring it with AIC
         candidates = [stats.norm, stats.t, stats.johnsonsu]
         fits, aics = {}, {}
         for dist in candidates:
-            dist_params = dist.fit(data)
-            fits[dist] = dist_params
-            log_lik = np.sum(dist.logpdf(data, *dist_params))
-            aics[dist] = 2 * len(dist_params) - 2 * log_lik
+            fits[dist] = dist.fit(data)
+            aics[dist] = aic(dist, fits[dist])
             print(f'{dist.name:>10} AIC: {aics[dist]:,.2f}')
 
         # Choosing the distribution with the lowest AIC
         distribution = min(aics, key=aics.get)
         params = fits[distribution]
         print(f'Selected: {distribution.name}')
+        candidate_aics = {d.name: float(a) for d, a in sorted(aics.items(), key=lambda item: item[1])}
     else:
         # Fitting the distribution to the returns via MLE (returns shape params, then loc and scale)
         params = distribution.fit(data)
+        candidate_aics = None
 
     # Creating a matrix to store the returns for each
     sims = np.zeros((n_sims, sim_length + 1))
@@ -169,12 +193,23 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
         # Adding the simulated values to the simulation matrix
         sims[i, 1:] = value
 
-    return sims
+    if not return_fit:
+        return sims
+
+    # Naming the fitted parameters: scipy orders them shapes, then loc and scale
+    names = [n.strip() for n in (distribution.shapes or '').split(',') if n.strip()] + ['loc', 'scale']
+    fit = {
+        'Distribution': distribution.name,
+        'Parameters': {name: float(value) for name, value in zip(names, params)},
+        'AIC': float(aic(distribution, params)),
+        'Candidates': candidate_aics,
+    }
+    return sims, fit
 
 
 
 def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_starts=10,
-                                 sim_length=100, n_sims=1000, random_state=None):
+                                 sim_length=100, n_sims=1000, random_state=None, return_fit=False):
     """Simulate future value paths from a Gaussian hidden Markov model of regimes.
 
     A hidden Markov model is fitted to one-period log returns, each hidden
@@ -210,13 +245,34 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
         Seed or Generator for the restarts and the draws. An int or a
         Generator gives reproducible paths; None gives a fresh, unseeded
         Generator.
+    return_fit : bool, default False
+        If True, also return the fitted model; see Returns.
 
     Returns
     -------
-    numpy.ndarray
+    sims : numpy.ndarray
         Array of shape ``(n_sims, sim_length + 1)``, one path per row. Column
         0 is the starting value, 1.0, so every value is a growth multiple of
         the last historical price.
+    fit : dict
+        Only if `return_fit` is True:
+
+        ``"Regime Count"``
+            Number of regimes used.
+        ``"BIC"``
+            dict of BIC by regime count: every count fitted when `n_regimes`
+            is None, otherwise just `n_regimes`.
+        ``"Log Likelihood"``
+            Log-likelihood of the model used.
+        ``"Regimes"``
+            pandas.DataFrame, one row per regime ordered from lowest to
+            highest volatility, with columns ``Mean`` and ``Volatility`` (of
+            the one-period log return), ``Expected Duration`` (periods,
+            ``1 / (1 - p_kk)``) and ``Current Probability`` (of being in that
+            regime at the last historical bar).
+        ``"Transition Matrix"``
+            pandas.DataFrame of one-period transition probabilities, from
+            the row regime to the column regime, in the same order.
 
     Raises
     ------
@@ -226,9 +282,10 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
 
     Notes
     -----
-    A restart is rejected if any fitted parameter is non-finite or if a
-    regime holds less than ``max(2, 1% of the history)`` of the expected
-    occupancy, since such a regime's parameters are meaningless.
+    Each regime is fitted by maximum likelihood (EM with no prior on the
+    variances). A restart is rejected if any fitted parameter is non-finite
+    or if a regime holds less than ``max(2, 1% of the history)`` of the
+    expected occupancy, since such a regime's parameters are meaningless.
 
     With `n_regimes=None`, the BIC is ``-2 log L + p log n``, with
     ``p = (K - 1) + K(K - 1) + 2K`` free parameters for K regimes (initial
@@ -236,7 +293,10 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
     counts that cannot be fitted are skipped.
 
     Prints the BIC of each regime count (when selecting), then each regime's
-    per-period mean, volatility and expected duration ``1 / (1 - p_kk)``.
+    per-period mean, volatility and expected duration ``1 / (1 - p_kk)``,
+    from lowest to highest volatility. The model numbers its regimes
+    arbitrarily; ordering them by volatility only changes how they are
+    reported, not the simulation.
 
     See Also
     --------
@@ -248,6 +308,10 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
     --------
     >>> sims = regime_switching_monte_carlo(prices, n_regimes=2, bootstrap=True,
     ...                                     random_state=42)
+    >>> sims, fit = regime_switching_monte_carlo(prices, random_state=42, return_fit=True)
+    >>> fit["Regime Count"]
+    3
+    >>> fit["Regimes"]["Volatility"]  # calm to turbulent
     """
     rng = np.random.default_rng(random_state)
 
@@ -258,8 +322,12 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
         # Fitting K regimes from several random starts and keeping the highest log-likelihood
         best, best_ll = None, -np.inf
         for seed in rng.integers(2**31 - 1, size=n_starts):
+            # covars_prior=0: hmmlearn's default prior (1e-2) adds 0.01 to every variance
+            # estimate, far larger than a daily return's variance (~1e-4), which inflated
+            # regime volatilities and made the fit, and so the BIC, penalized rather than
+            # maximum likelihood. Degenerate fits the prior guards against are rejected below.
             model = GaussianHMM(n_components=K, covariance_type='full', n_iter=1000, tol=1e-6,
-                                random_state=int(seed))
+                                covars_prior=0.0, random_state=int(seed))
             # Degenerate starts are common and are rejected below, so silence hmmlearn's warnings about them
             hmm_log = logging.getLogger('hmmlearn')
             level, hmm_log.level = hmm_log.level, logging.ERROR
@@ -286,9 +354,14 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
             raise ValueError(f'Could not fit {K} regimes to {len(X)} returns; try fewer regimes or more history')
         return best, best_ll
 
+    def bic(K, log_lik):
+        # BIC = -2*log-likelihood + n_params*log(n_obs). Free parameters for one series:
+        # initial probs (K-1) + transitions K(K-1) + a mean and variance per regime
+        n_params = (K - 1) + K * (K - 1) + 2 * K
+        return -2 * log_lik + n_params * np.log(len(X))
+
     if n_regimes is None:
-        # Scoring each regime count with BIC = -2*log-likelihood + n_params*log(n_obs)
-        # Free parameters for one series: initial probs (K-1) + transitions K(K-1) + a mean and variance per regime
+        # Scoring each regime count with BIC
         fits, bics = {}, {}
         for K in (1, 2, 3):
             try:
@@ -297,26 +370,32 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
                 # Short or featureless histories may not support K distinct regimes
                 print(f'{K} regime(s): no stable fit, skipped')
                 continue
-            n_params = (K - 1) + K * (K - 1) + 2 * K
-            bics[K] = -2 * fits[K][1] + n_params * np.log(len(X))
+            bics[K] = bic(K, fits[K][1])
             print(f'{K} regime(s) BIC: {bics[K]:,.2f}')
 
         # Choosing the regime count with the lowest BIC
         n_regimes = min(bics, key=bics.get)
-        model = fits[n_regimes][0]
+        model, log_lik = fits[n_regimes]
         print(f'Selected: {n_regimes} regime(s)')
     else:
-        model = fit(n_regimes)[0]
+        model, log_lik = fit(n_regimes)
+        bics = {n_regimes: bic(n_regimes, log_lik)}
 
-    # Each regime's per-period mean and volatility, and how long it tends to last
+    # Each regime's per-period mean and volatility, how long it tends to last, and
+    # how likely it is to be the current regime. The model numbers regimes arbitrarily,
+    # so they are reported from calmest to most volatile; the simulation below uses
+    # the model's own numbering.
     P = model.transmat_
     means, vols = model.means_[:, 0], np.sqrt(model.covars_[:, 0, 0])
-    for k in range(n_regimes):
-        duration = np.inf if P[k, k] >= 1 else 1 / (1 - P[k, k])
-        print(f'Regime {k}: mean {means[k]:+.4%}, vol {vols[k]:.4%}, expected duration {duration:.1f} periods')
+    durations = np.array([np.inf if P[k, k] >= 1 else 1 / (1 - P[k, k]) for k in range(n_regimes)])
+    current = model.predict_proba(X)[-1]
+    order = np.argsort(vols, kind='stable')
+    for rank, k in enumerate(order):
+        print(f'Regime {rank}: mean {means[k]:+.4%}, vol {vols[k]:.4%}, '
+              f'expected duration {durations[k]:.1f} periods')
 
     # Starting each path in a regime drawn from today's regime probabilities
-    regime = rng.choice(n_regimes, size=n_sims, p=model.predict_proba(X)[-1])
+    regime = rng.choice(n_regimes, size=n_sims, p=current)
 
     if bootstrap:
         # Historical returns grouped by their most likely regime
@@ -346,4 +425,21 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
     # The cumulative returns over the simulation period (log returns add, so exponentiate the running sum)
     sims[:, 1:] = np.exp(np.cumsum(log_rets, axis=1))
 
-    return sims
+    if not return_fit:
+        return sims
+
+    labels = pd.RangeIndex(n_regimes, name='Regime')
+    regimes = pd.DataFrame({
+        'Mean': means[order],
+        'Volatility': vols[order],
+        'Expected Duration': durations[order],
+        'Current Probability': current[order],
+    }, index=labels)
+    fitted = {
+        'Regime Count': int(n_regimes),
+        'BIC': {K: float(b) for K, b in sorted(bics.items())},
+        'Log Likelihood': float(log_lik),
+        'Regimes': regimes,
+        'Transition Matrix': pd.DataFrame(P[np.ix_(order, order)], index=labels, columns=labels),
+    }
+    return sims, fitted
