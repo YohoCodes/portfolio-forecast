@@ -5,4 +5,5 @@ Subpackages:
     performance  backtest simulators and performance / statistical reports
     plotting     fan charts of simulated paths
     utils        next_trading_dates for labelling simulated periods
+    reporting    compile statistical reports into a PDF with LaTeX
 """

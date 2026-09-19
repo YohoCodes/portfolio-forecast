@@ -5,7 +5,8 @@ strategy. Give it a price or portfolio-value history and it simulates
 thousands of possible future paths by three methods: resampling past returns,
 drawing from a fitted distribution, or switching between fitted market
 regimes. It then summarizes the spread of outcomes (returns, risk and tail
-risk, with confidence intervals) and draws them as fan charts. It also
+risk, with confidence intervals), draws them as fan charts, and typesets
+the results as a PDF report. It also
 includes backtests for buy-and-hold and scheduled-rebalancing portfolios, and
 a performance report for a single historical series.
 
@@ -21,6 +22,7 @@ a performance report for a single historical series.
   - [Reporting](#reporting)
   - [Metrics](#metrics)
   - [Plotting](#plotting)
+  - [PDF reports](#pdf-reports)
   - [Trading dates and bar sizes](#trading-dates-and-bar-sizes)
   - [Backtesting](#backtesting)
   - [Internal helpers](#internal-helpers)
@@ -66,6 +68,10 @@ and python-dateutil. The package does not fetch data itself; the
 [Quick start](#quick-start) downloads prices with yfinance
 (`pip install yfinance`).
 
+[`compile_statistical_reports`](#compile_statistical_reports) also needs a
+LaTeX distribution with `pdflatex` on the PATH: TeX Live, MacTeX on macOS or
+MiKTeX on Windows. Nothing else in the package uses LaTeX.
+
 For local development, from the repo root:
 
 ```bash
@@ -76,7 +82,8 @@ The `notebook` extra adds `ipykernel` and `yfinance` for `sandbox.ipynb`, a
 worked example of all three simulators on ten years of daily AAPL prices from
 Yahoo Finance.
 
-To run the tests (no network access needed):
+To run the tests (no network access needed; the PDF tests are skipped
+without `pdflatex`):
 
 ```bash
 pip install -e ".[test]"
@@ -93,6 +100,7 @@ import yfinance as yf
 from portfolio_forecast.forecast import nonparametric_monte_carlo
 from portfolio_forecast.performance import statistical_report
 from portfolio_forecast.plotting import plot_simulated_paths
+from portfolio_forecast.reporting import compile_statistical_reports
 from portfolio_forecast.utils import next_trading_dates
 
 # Ten years of daily closes: a date-indexed frame with one column
@@ -106,6 +114,19 @@ dates = prices.index[-1:].append(next_trading_dates(prices.index, 100))
 
 report = statistical_report(sims, interval="1 day", dates=dates, display=True)
 fig, ax = plot_simulated_paths(sims, method="Non-parametric Monte Carlo", dates=dates)
+
+# Typeset the results and chart as Reporting/AAPL_100_Day_Outlook.pdf (needs LaTeX)
+compile_statistical_reports({
+    "Title": "AAPL 100-Day Outlook",
+    "Introduction": "1,000 paths resampled from ten years of daily AAPL returns.",
+    "Reports": {
+        "Non-parametric Monte Carlo": {
+            "Description": "Bootstrap of historical daily returns.",
+            "Results": report,
+            "Figures": {"Paths": {"Image": fig, "Caption": "Simulated paths and their median."}},
+        },
+    },
+})
 ```
 
 ---
@@ -121,6 +142,7 @@ package.
 | `src/portfolio_forecast/performance/report.py` | Reports: [`statistical_report`](#statistical_report), [`performance_report`](#performance_report); [metrics](#metrics) |
 | `src/portfolio_forecast/performance/simulate.py` | Backtests: [`simulate_buy_and_hold`](#simulate_buy_and_hold), [`simulate_rebalancing_MVO`](#simulate_rebalancing_mvo), [`get_closing_prices`](#get_closing_prices) |
 | `src/portfolio_forecast/plotting/paths.py` | Fan charts: [`plot_simulated_paths`](#plot_simulated_paths), [`plot_path_comparison`](#plot_path_comparison) |
+| `src/portfolio_forecast/reporting/pdf.py` | PDF reports: [`compile_statistical_reports`](#compile_statistical_reports) |
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
 | `sandbox.ipynb` | Worked example of all three simulators, their plots and reports |
@@ -180,6 +202,41 @@ dates = prices.index[-1:].append(next_trading_dates(prices.index, n_periods))
 
 The plots use it to label the x-axis, and
 [`statistical_report`](#statistical_report) to show the calendar span.
+
+### Report dictionary
+
+What [`compile_statistical_reports`](#compile_statistical_reports) takes.
+Reports and figures appear in the PDF in dictionary order.
+
+```python
+{
+    "Title": "Generic Title",
+    "Introduction": "",
+    "Reports": {
+        "Report 1 Name": {
+            "Description": "",
+            "Results": results1,
+            "Figures": {
+                "Fig1": {"Image": fig1, "Caption": ""},
+            },
+        },
+    },
+}
+```
+
+| Key | Required | Type | Becomes |
+| --- | --- | --- | --- |
+| `"Title"` | yes | `str` | Document title, page header and default file name |
+| `"Introduction"` | no | `str` | Text under the title |
+| `"Reports"` | yes | `dict` | One numbered section per entry, titled by its key |
+| `"Description"` | no | `str` | Text at the start of the section |
+| `"Results"` | yes | `dict` | Tables: the dict returned by [`statistical_report`](#statistical_report) |
+| `"Figures"` | no | `dict` | Numbered figures; the keys only name them in error messages |
+| `"Image"` | yes, per figure | `matplotlib.figure.Figure` | The figure, embedded as vector graphics |
+| `"Caption"` | no | `str` | Caption under the figure |
+
+All text is printed literally: LaTeX special characters (`% & $ # _ { } ~ ^ \`)
+are escaped, and a blank line starts a new paragraph.
 
 ---
 
@@ -519,6 +576,50 @@ color scale, so heights and colors compare directly across panels.
 
 **See also** — [`plot_simulated_paths`](#plot_simulated_paths).
 
+### PDF reports
+
+`from portfolio_forecast.reporting import compile_statistical_reports`
+
+#### `compile_statistical_reports`
+
+```python
+compile_statistical_reports(spec, output_dir='Reporting', filename=None, engine='pdflatex')
+```
+
+Typeset a [report dictionary](#report-dictionary) as a PDF with LaTeX: the
+title, date and introduction, a table of contents when there is more than one
+report, then a section per report with its description, its results as tables
+(simulation setup, returns, risk, tail risk) and its figures. LaTeX runs in a
+temporary directory, so the PDF is the only file written.
+
+**Parameters**
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `spec` | `dict` | — | A [report dictionary](#report-dictionary). |
+| `output_dir` | `str` or path | `'Reporting'` | Directory for the PDF, created if missing; relative to the working directory, normally the project folder. |
+| `filename` | `str` | `None` | PDF name; defaults to the title with non-alphanumeric runs replaced by `_` (`Generic_Title.pdf`). `.pdf` is added if missing. An existing file of that name is replaced. |
+| `engine` | `str` | `'pdflatex'` | LaTeX engine; `xelatex` and `lualatex` also work. |
+
+**Returns** — `pathlib.Path`, the absolute path of the PDF.
+
+**Raises** — `TypeError` if `spec` is not a dict or an `"Image"` is not a
+matplotlib Figure. `ValueError` if `"Title"` or `"Reports"` is missing or
+empty, or a `"Results"` is not from `statistical_report`. `RuntimeError` if
+the engine is not installed, or LaTeX fails (the end of its log is included);
+nothing is written in either case.
+
+**Notes** — Needs the booktabs, caption, fancyhdr, float, geometry, hyperref,
+lmodern and microtype LaTeX packages, all part of TeX Live, MacTeX and MiKTeX.
+Figures are embedded as vector PDF and are not modified or closed; a figure
+is scaled to the text width, so a wide one (such as a three-panel
+[`plot_path_comparison`](#plot_path_comparison)) gets small labels. With
+`pdflatex`, text must use characters it can typeset (Latin scripts, common
+symbols); an emoji, for example, makes LaTeX fail.
+
+**See also** — [`statistical_report`](#statistical_report),
+[`plot_simulated_paths`](#plot_simulated_paths).
+
 ### Trading dates and bar sizes
 
 `from portfolio_forecast.utils import next_trading_dates, PERIODS_PER_YEAR`
@@ -668,6 +769,7 @@ Private functions, listed for completeness.
 | `_buyable(w_new, quotes)` | `performance/simulate.py` | The book a suggestion can actually buy, renormalized |
 | `_turnover(a, b)` | `performance/simulate.py` | One-way turnover between two books, counting cash |
 | `_label_dates`, `_draw_paths`, `_add_colorbar` | `plotting/paths.py` | Axis labels, one fan of paths, and the colorbar |
+| `_escape`, `_number`, `_slug`, `_interval_table`, `_results_section`, `_validate` | `reporting/pdf.py` | Escape text for LaTeX, format table values, name the file, build the tables, and check the report dictionary |
 | `_parse_interval`, `_infer_interval`, `_next_sessions`, `_next_periodic`, `_next_intraday` | `utils/trading_dates.py` | Parse or infer a bar size, then step forward by sessions, weeks/months or intraday bars |
 
 ---

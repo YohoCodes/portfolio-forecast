@@ -1,5 +1,7 @@
 # Local data files
 Data/
+# PDFs from compile_statistical_reports
+/Reporting/
 
 venv/
 .venv/
