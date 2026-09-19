@@ -76,6 +76,13 @@ The `notebook` extra adds `ipykernel` and `yfinance` for `sandbox.ipynb`, a
 worked example of all three simulators on ten years of daily AAPL prices from
 Yahoo Finance.
 
+To run the tests (no network access needed):
+
+```bash
+pip install -e ".[test]"
+pytest
+```
+
 ---
 
 ## Quick start
