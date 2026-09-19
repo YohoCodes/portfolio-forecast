@@ -1,0 +1,12 @@
+# Local data files
+Data/
+
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+.DS_Store

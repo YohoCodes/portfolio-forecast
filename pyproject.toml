@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio-forecast"
+version = "0.1.0"
+description = "Monte Carlo simulation of future portfolio and strategy returns"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "hmmlearn",
+    "exchange_calendars",
+    "python-dateutil",
+]
+
+[project.urls]
+Repository = "https://github.com/YohoCodes/portfolio-forecast"
+
+[project.optional-dependencies]
+# The example notebook, which downloads prices from Yahoo Finance
+notebook = ["ipykernel", "yfinance"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
