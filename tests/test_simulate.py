@@ -35,6 +35,16 @@ class TestGetClosingPrices:
     def test_frame_of_closes_passes_through(self, two_assets):
         assert get_closing_prices(two_assets) is two_assets
 
+    def test_multiindex_prefers_adjusted_close(self):
+        # yfinance.download(..., auto_adjust=False) returns both; only Adj Close includes dividends
+        cols = pd.MultiIndex.from_product([["Adj Close", "Close"], ["A", "B"]], names=["Price", "Ticker"])
+        data = pd.DataFrame([[1.0, 2.0, 10.0, 20.0]], columns=cols)
+        assert get_closing_prices(data).iloc[0].tolist() == [1.0, 2.0]
+
+    def test_flat_ohlcv_prefers_adjusted_close(self):
+        data = pd.DataFrame({"close": [2.0], "adj_close": [1.5], "volume": [3.0]})
+        assert get_closing_prices(data).columns.tolist() == ["adj_close"]
+
     def test_multiindex_without_close_raises(self):
         cols = pd.MultiIndex.from_product([["A"], ["open", "high"]])
         with pytest.raises(KeyError):
@@ -59,9 +69,37 @@ class TestBuyAndHold:
         by_position, _ = simulate_buy_and_hold(two_assets, [0.25, 0.75])
         pd.testing.assert_series_equal(by_label, by_position)
 
+    def test_dict_weights_match_series_weights(self, two_assets):
+        by_dict, _ = simulate_buy_and_hold(two_assets, {"B": 3.0, "A": 1.0})
+        by_series, _ = simulate_buy_and_hold(two_assets, pd.Series({"B": 3.0, "A": 1.0}))
+        pd.testing.assert_series_equal(by_dict, by_series)
+
     def test_symbol_missing_from_series_weights_is_unheld(self, two_assets):
         values, _ = simulate_buy_and_hold(two_assets, pd.Series({"A": 1.0}))
         assert values.iloc[-1] == pytest.approx(2.0)
+
+    def test_complete_history_does_not_warn(self, two_assets, recwarn):
+        simulate_buy_and_hold(two_assets, [0.5, 0.5])
+        assert not recwarn
+
+    def test_late_listed_symbol_is_dropped_with_a_warning(self, two_assets):
+        # C lists on the fourth bar, so its first three returns are missing
+        data = two_assets.assign(C=[np.nan, np.nan, np.nan, 10, 11, 12.0])
+        with pytest.warns(UserWarning, match=r"C \(3 of 5 returns missing, first price 2025-01-07\)"):
+            values, _ = simulate_buy_and_hold(data, {"A": 0.25, "B": 0.25, "C": 0.5})
+        # Dropping C renormalizes A and B to half each
+        expected, _ = simulate_buy_and_hold(two_assets, [0.5, 0.5])
+        pd.testing.assert_series_equal(values, expected)
+
+    def test_gap_inside_history_is_filled_not_dropped(self, two_assets, recwarn):
+        # A missing close mid-history is carried from the last price, so the
+        # return across the gap is measured from 120 and the symbol is kept
+        gapped = two_assets.copy()
+        gapped.loc[DATES[3], "A"] = np.nan
+        values, _ = simulate_buy_and_hold(gapped, [1.0, 0.0])
+        filled, _ = simulate_buy_and_hold(two_assets.assign(A=[100, 110, 120, 120, 180, 200.0]), [1.0, 0.0])
+        pd.testing.assert_series_equal(values, filled)
+        assert not recwarn
 
     def test_zero_weights_raise(self, two_assets):
         with pytest.raises(ValueError, match="sum to zero"):

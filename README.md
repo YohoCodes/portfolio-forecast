@@ -154,6 +154,7 @@ package.
 | `tests/` | `pytest` suite covering every subpackage |
 | `demo.ipynb` | Worked example: all three simulators, their plots and statistical reports, and a PDF report |
 | `CONTRIBUTING.md` | How to set up, the code and docstring conventions, and what a pull request needs |
+| `CHANGELOG.md` | Notable changes in each release |
 
 Each subpackage re-exports its public functions, e.g.
 `from portfolio_forecast.performance import statistical_report`.
@@ -731,7 +732,7 @@ rebalanced, so its weights drift with prices.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `data` | `DataFrame` | — | Historical prices in any layout [`get_closing_prices`](#get_closing_prices) accepts. |
-| `w` | `Series` or array-like | — | Weights: a Series aligned by symbol (missing symbols get zero), or an array matched by column position. Normalized to sum to 1. |
+| `w` | `Series`, `dict` or array-like | — | Weights: a Series or dict aligned by symbol (missing symbols get zero), or an array matched by column position. Normalized to sum to 1. |
 | `br0` | `float` | `1` | Starting portfolio value. |
 
 **Returns** — `(values, dates)`: a `Series` of portfolio values starting at
@@ -740,8 +741,12 @@ rebalanced, so its weights drift with prices.
 **Raises** — `ValueError` if the weights sum to zero or less, or an array of
 weights does not have one entry per symbol.
 
-**Notes** — Symbols with any missing return are dropped, then bars with any
-missing return.
+**Warns** — `UserWarning` naming each symbol dropped for missing prices, with
+how many returns it is missing and the date of its first price.
+
+**Notes** — A gap inside a symbol's history is filled with its last known
+price. A symbol with no price at the start (e.g. listed partway through) is
+dropped entirely, and the remaining weights are renormalized.
 
 **See also** — [`performance_report`](#performance_report).
 
@@ -786,9 +791,11 @@ get_closing_prices(data)
 ```
 
 Select closing prices as a (date × symbol) frame. Accepts MultiIndex columns
-with a `close` field on either level (e.g. from `yfinance.download`), flat
-OHLCV columns for one symbol, or a frame that is already closes. Import from
-`portfolio_forecast.performance.simulate`.
+with a close field on either level (e.g. from `yfinance.download`), flat
+OHLCV columns for one symbol, or a frame that is already closes. Field names
+match case-insensitively, and an adjusted close (`Adj Close`, `adj_close` or
+`adjclose`) is preferred over `Close` because it includes dividends. Import
+from `portfolio_forecast.performance.simulate`.
 
 **Parameters** — `data` (`DataFrame`) prices.
 
@@ -806,6 +813,7 @@ Private functions, listed for completeness.
 | `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
 | `_periods_per_year(interval)` | `performance/report.py` | Look up bars per year for any accepted [`interval`](#interval) spelling |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
+| `_find_close(labels)` | `performance/simulate.py` | The preferred close field among column labels, adjusted close first |
 | `_hold(closing, start_i, end_i, held, w_held)` | `performance/simulate.py` | Growth and drifted weights of a book held between two bars |
 | `_buyable(w_new, quotes)` | `performance/simulate.py` | The book a suggestion can actually buy, renormalized |
 | `_turnover(a, b)` | `performance/simulate.py` | One-way turnover between two books, counting cash |

@@ -82,8 +82,9 @@ def nonparametric_monte_carlo(values=None, sim_length=100, n_sims=1000, random_s
     values = _resolve_values(values, prices, 'nonparametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between values
-    returns = values.pct_change().dropna()
+    # Calculating the percent change between values, measuring a return across a gap
+    # from the last known value (explicit, as pandas 3 no longer fills by default)
+    returns = values.ffill().pct_change(fill_method=None).dropna()
 
     # Creating a matrix to store the returns for each
     sims = np.zeros((n_sims, sim_length + 1))
@@ -193,8 +194,9 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
     values = _resolve_values(values, prices, 'parametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between values
-    returns = values.pct_change().dropna()
+    # Calculating the percent change between values, measuring a return across a gap
+    # from the last known value (explicit, as pandas 3 no longer fills by default)
+    returns = values.ffill().pct_change(fill_method=None).dropna()
 
     data = returns.to_numpy().flatten()
 

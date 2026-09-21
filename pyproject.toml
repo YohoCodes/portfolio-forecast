@@ -22,6 +22,7 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/YohoCodes/portfolio-forecast"
+Changelog = "https://github.com/YohoCodes/portfolio-forecast/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # The example notebook, which downloads prices from Yahoo Finance
