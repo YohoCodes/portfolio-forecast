@@ -50,6 +50,34 @@ class TestSimsContract:
         assert np.array_equal(a, b)
 
 
+@pytest.mark.parametrize("simulate, kwargs", SIMULATORS)
+class TestDeprecatedPrices:
+    """`prices` still works as an alias for `values` until 1.0.0, with a warning."""
+
+    def test_values_keyword_does_not_warn(self, simulate, kwargs, prices, recwarn):
+        simulate(values=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+    def test_prices_warns_and_matches_values(self, simulate, kwargs, prices):
+        expected = simulate(prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        with pytest.warns(DeprecationWarning, match="removed in 1.0.0"):
+            got = simulate(prices=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        np.testing.assert_array_equal(got, expected)
+
+    def test_warning_points_at_the_caller(self, simulate, kwargs, prices):
+        with pytest.warns(DeprecationWarning) as record:
+            simulate(prices=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        assert record[0].filename == __file__
+
+    def test_both_raise(self, simulate, kwargs, prices):
+        with pytest.raises(TypeError, match="both"):
+            simulate(prices, prices=prices, sim_length=5, n_sims=3, **kwargs)
+
+    def test_neither_raises(self, simulate, kwargs):
+        with pytest.raises(TypeError, match="missing"):
+            simulate(sim_length=5, n_sims=3, **kwargs)
+
+
 class TestNonparametric:
     def test_every_draw_is_a_historical_return(self, prices):
         sims = nonparametric_monte_carlo(prices, sim_length=25, n_sims=20, random_state=0)
