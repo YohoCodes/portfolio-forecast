@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# LineCollection draws many lines in one call (much faster than 1,000 ax.plot calls)
-from matplotlib.collections import LineCollection
 # Formats tick labels with thousands separators, and places/labels date ticks
 import pandas as pd
+
+# LineCollection draws many lines in one call (much faster than 1,000 ax.plot calls)
+from matplotlib.collections import LineCollection
 from matplotlib.ticker import FuncFormatter, MaxNLocator, StrMethodFormatter
 
 
@@ -191,7 +192,7 @@ def plot_path_comparison(sims_by_method, dates=None, figsize=None, dpi=120):
                              layout='constrained', squeeze=False)
     axes = axes[0]
 
-    for ax, (method, sims) in zip(axes, sims_by_method.items()):
+    for ax, (method, sims) in zip(axes, sims_by_method.items(), strict=True):
         _draw_paths(ax, sims, method, cmap, norm, ylim, dates=dates)
         # Narrower panels: put the path count on its own line
         ax.set_title(f'{method}\n{sims.shape[0]:,} simulated paths', fontsize=13,
