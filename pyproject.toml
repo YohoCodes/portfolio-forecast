@@ -27,9 +27,19 @@ Repository = "https://github.com/YohoCodes/portfolio-forecast"
 # The example notebook, which downloads prices from Yahoo Finance
 notebook = ["ipykernel", "yfinance"]
 test = ["pytest"]
+lint = ["ruff"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["venv", "dist"]
+
+[tool.ruff.lint]
+# pycodestyle errors and warnings, pyflakes, import order, likely bugs
+select = ["E", "W", "F", "I", "B"]

@@ -1,8 +1,8 @@
 import re
 
-import pandas as pd
 # Exchange calendar with NYSE holidays, special closures, and early closes
 import exchange_calendars as xcals
+import pandas as pd
 from dateutil.tz import tzlocal
 
 
@@ -85,8 +85,8 @@ def _next_periodic(dates, n_periods, kind, step, cal):
     # session of its week/month? (A one-session period counts as both.)
     labels = dates.tz_localize(None)
     periods = labels.to_period(freq)
-    first_votes = sum(firsts.get(p) == d for p, d in zip(periods, labels))
-    last_votes = sum(lasts.get(p) == d for p, d in zip(periods, labels))
+    first_votes = sum(firsts.get(p) == d for p, d in zip(periods, labels, strict=True))
+    last_votes = sum(lasts.get(p) == d for p, d in zip(periods, labels, strict=True))
     anchor = firsts if first_votes >= last_votes else lasts
 
     # Periods after the last bar's, taking every step-th one

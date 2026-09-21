@@ -3,8 +3,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from portfolio_forecast.forecast import (nonparametric_monte_carlo, parametric_monte_carlo,
-                                         regime_switching_monte_carlo)
+from portfolio_forecast.forecast import nonparametric_monte_carlo, parametric_monte_carlo, regime_switching_monte_carlo
 
 # Every simulator, with keyword arguments that keep the fits quick and quiet
 SIMULATORS = [
