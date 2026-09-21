@@ -120,6 +120,11 @@ Public names don't break without warning. To rename or remove a parameter:
 - Branch from `main` and keep each pull request to one change.
 - Write the description as what changed and why, and link the issue it
   addresses.
+- If users would notice the change, add a line under `## [Unreleased]` in
+  [CHANGELOG.md](CHANGELOG.md), in the right section (Added, Changed,
+  Deprecated, Removed or Fixed), written for users: what they will see and
+  what, if anything, they need to do. Internal refactors and test-only
+  changes don't need one.
 - Don't bump the version number in `pyproject.toml`; that happens at
   release.
 
