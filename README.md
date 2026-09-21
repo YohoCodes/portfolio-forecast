@@ -6,9 +6,8 @@ thousands of possible future paths by three methods: resampling past returns,
 drawing from a fitted distribution, or switching between fitted market
 regimes. It then summarizes the spread of outcomes (returns, risk and tail
 risk, with confidence intervals), draws them as fan charts, and typesets the
-results as a PDF report. It also includes backtests for buy-and-hold and
-scheduled-rebalancing portfolios, and a performance report for a single
-historical series.
+results as a PDF report. It also includes a buy-and-hold backtest and a
+performance report for a single historical series.
 
 ## Table of contents
 
@@ -188,7 +187,7 @@ package.
 | --- | --- |
 | `src/portfolio_forecast/forecast/monte_carlo.py` | Simulators: [`nonparametric_monte_carlo`](#nonparametric_monte_carlo), [`parametric_monte_carlo`](#parametric_monte_carlo), [`regime_switching_monte_carlo`](#regime_switching_monte_carlo) |
 | `src/portfolio_forecast/performance/report.py` | Reports: [`statistical_report`](#statistical_report), [`performance_report`](#performance_report); [metrics](#metrics) |
-| `src/portfolio_forecast/performance/simulate.py` | Backtests: [`simulate_buy_and_hold`](#simulate_buy_and_hold), [`simulate_rebalancing_MVO`](#simulate_rebalancing_mvo), [`get_closing_prices`](#get_closing_prices) |
+| `src/portfolio_forecast/performance/simulate.py` | Backtests: [`simulate_buy_and_hold`](#simulate_buy_and_hold), [`get_closing_prices`](#get_closing_prices) |
 | `src/portfolio_forecast/plotting/paths.py` | Fan charts: [`plot_simulated_paths`](#plot_simulated_paths), [`plot_path_comparison`](#plot_path_comparison) |
 | `src/portfolio_forecast/reporting/pdf.py` | PDF reports: [`compile_statistical_reports`](#compile_statistical_reports) |
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
@@ -793,40 +792,6 @@ dropped entirely, and the remaining weights are renormalized.
 
 **See also** — [`performance_report`](#performance_report).
 
-#### `simulate_rebalancing_MVO`
-
-```python
-simulate_rebalancing_MVO(data, w, beta=0, br0=1)
-```
-
-Backtest a book re-weighted on a schedule, trading only when the suggested
-book differs enough from the drifted book actually held.
-
-**Parameters**
-
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `data` | `DataFrame` | — | Historical prices in any layout [`get_closing_prices`](#get_closing_prices) accepts. |
-| `w` | `DataFrame` | — | Suggested weights, one row per symbol and one column per rebalance timestamp (e.g. from a mean-variance optimizer, not included). A column must be all weights or all NaN (no suggestion); every label must be in the price index. |
-| `beta` | `float` | `0` | No-trade band in [0, 1]: trade only if one-way turnover exceeds it. `0` trades at every suggestion; `1` never trades after the first. |
-| `br0` | `float` | `1` | Starting portfolio value. |
-
-**Returns** — `(values, dates, decisions)`: portfolio value at every bar
-(flat at `br0` until the first trade), its index, and a `Series` over the
-rebalance timestamps reading `'traded'`, `'held'` (inside the band) or
-`'skipped'` (no suggestion).
-
-**Raises** — `TypeError` if `w` is not a DataFrame. `ValueError` if `beta` is
-outside [0, 1], a column is partly NaN, a timestamp is not in the price index,
-or timestamps are not strictly increasing.
-
-**Notes** — One-way turnover is `0.5 * (sum(|w_new - w_drifted|) +
-|cash_new - cash_drifted|)`. A symbol with no quote on the fill bar is dropped
-and the book renormalized. Missing quotes while held carry the last price
-forward. No transaction costs.
-
-**See also** — [`simulate_buy_and_hold`](#simulate_buy_and_hold).
-
 #### `get_closing_prices`
 
 ```python
@@ -857,9 +822,6 @@ Private functions, listed for completeness.
 | `_periods_per_year(interval)` | `performance/report.py` | Look up bars per year for any accepted [`interval`](#interval) spelling |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
 | `_find_close(labels)` | `performance/simulate.py` | The preferred close field among column labels, adjusted close first |
-| `_hold(closing, start_i, end_i, held, w_held)` | `performance/simulate.py` | Growth and drifted weights of a book held between two bars |
-| `_buyable(w_new, quotes)` | `performance/simulate.py` | The book a suggestion can actually buy, renormalized |
-| `_turnover(a, b)` | `performance/simulate.py` | One-way turnover between two books, counting cash |
 | `_label_dates`, `_draw_paths`, `_add_colorbar` | `plotting/paths.py` | Axis labels, one fan of paths, and the colorbar |
 | `_escape`, `_number`, `_slug`, `_interval_table`, `_results_section`, `_validate` | `reporting/pdf.py` | Escape text for LaTeX, format table values, name the file, build the tables, and check the report dictionary |
 | `_parse_interval`, `_infer_interval`, `_next_sessions`, `_next_periodic`, `_next_intraday` | `utils/trading_dates.py` | Parse or infer a bar size, then step forward by sessions, weeks/months or intraday bars |

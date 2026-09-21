@@ -6,6 +6,14 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- `simulate_rebalancing_MVO`. It backtested weights from a mean-variance
+  optimizer that was never part of this package, and treated weights summing
+  to less than 1 as fully invested instead of holding the rest as cash. To
+  keep using it, pin `portfolio-forecast<0.3` or copy it from the 0.2.0
+  source. `simulate_buy_and_hold` is unaffected.
+
 ## [0.2.0] - 2026-09-21
 
 ### Added
