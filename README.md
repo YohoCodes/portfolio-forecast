@@ -15,6 +15,8 @@ historical series.
 - [Concepts](#concepts)
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Demos](#demos)
+  - [Installing the demos](#installing-the-demos)
 - [Project layout](#project-layout)
 - [Standardized objects](#standardized-objects)
 - [API reference](#api-reference)
@@ -72,20 +74,10 @@ and python-dateutil. The package does not fetch data itself; the
 LaTeX distribution with `pdflatex` on the PATH: TeX Live, MacTeX on macOS or
 MiKTeX on Windows. Nothing else in the package uses LaTeX.
 
-For local development, from the repo root:
+To run the demo notebooks, see [Demos](#demos).
 
-```bash
-pip install -e ".[notebook]"
-```
-
-The `notebook` extra adds `ipykernel` and `yfinance` for `demo.ipynb`, a worked
-example on ten years of daily AAPL prices from Yahoo Finance: it runs all
-three simulators, plots and compares their paths, prints their statistical
-reports, and compiles a PDF report of the parametric and regime-switching
-results (this last step needs LaTeX).
-
-To run the tests (no network access needed; the PDF tests are skipped
-without `pdflatex`):
+For local development, from the repo root, run the tests (no network access
+needed; the PDF tests are skipped without `pdflatex`):
 
 ```bash
 pip install -e ".[test]"
@@ -137,6 +129,56 @@ compile_statistical_reports({
 
 ---
 
+## Demos
+
+Two Jupyter notebooks work through complete examples on ten years of daily
+prices from Yahoo Finance:
+
+| Notebook | What it does |
+| --- | --- |
+| `demo_simulate_portfolio.ipynb` | Backtests a five-stock buy-and-hold portfolio with [`simulate_buy_and_hold`](#simulate_buy_and_hold), then forecasts its next 100 trading days with [`regime_switching_monte_carlo`](#regime_switching_monte_carlo) |
+| `demo_full_report.ipynb` | Runs all three simulators on AAPL, compares their paths and statistical reports, and compiles a PDF report with [`compile_statistical_reports`](#compile_statistical_reports) |
+
+To read them without installing anything, open them on
+[GitHub](https://github.com/YohoCodes/portfolio-forecast), which shows the
+saved outputs.
+
+### Installing the demos
+
+The notebooks are not part of the `pip install` package, so get them from the
+repository.
+
+1. Clone the repository and create a virtual environment:
+
+   ```bash
+   git clone https://github.com/YohoCodes/portfolio-forecast.git
+   cd portfolio-forecast
+   python -m venv venv
+   source venv/bin/activate        # Windows: venv\Scripts\activate
+   ```
+
+2. Install the package with the `notebook` extra, which adds `yfinance` to
+   download prices and `ipykernel` to run the notebooks:
+
+   ```bash
+   pip install -e ".[notebook]"
+   ```
+
+3. Open a demo. The extra doesn't include Jupyter itself; to use JupyterLab:
+
+   ```bash
+   pip install jupyterlab
+   jupyter lab demo_simulate_portfolio.ipynb
+   ```
+
+   In VS Code, open the notebook and select the `venv` Python as its kernel.
+
+4. Run all cells. Both demos need internet access to download prices, and the
+   last step of `demo_full_report.ipynb` needs LaTeX (see
+   [Installation](#installation)).
+
+---
+
 ## Project layout
 
 The distribution is `portfolio-forecast`; it installs the `portfolio_forecast`
@@ -152,7 +194,8 @@ package.
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
 | `tests/` | `pytest` suite covering every subpackage |
-| `demo.ipynb` | Worked example: all three simulators, their plots and statistical reports, and a PDF report |
+| `demo_full_report.ipynb` | Worked example: all three simulators on one stock, their plots and statistical reports, and a PDF report |
+| `demo_simulate_portfolio.ipynb` | Worked example: backtest a five-stock portfolio, then forecast it with regime-switching Monte Carlo |
 | `CONTRIBUTING.md` | How to set up, the code and docstring conventions, and what a pull request needs |
 | `CHANGELOG.md` | Notable changes in each release |
 
