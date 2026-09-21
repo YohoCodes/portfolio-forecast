@@ -7,19 +7,32 @@ from hmmlearn.hmm import GaussianHMM
 from scipy import stats
 
 
-def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=None):
+def _resolve_values(values, prices, func_name):
+    # Accepting the deprecated `prices` keyword in place of `values` until 1.0.0
+    if prices is None:
+        if values is None:
+            raise TypeError(f"{func_name}() missing 1 required argument: 'values'")
+        return values
+    if values is not None:
+        raise TypeError(f"{func_name}() got both 'values' and 'prices'; pass only 'values'")
+    warnings.warn(f"{func_name}(prices=...) is deprecated and will be removed in 1.0.0; "
+                  "use values=... instead", DeprecationWarning, stacklevel=3)
+    return prices
+
+
+def nonparametric_monte_carlo(values=None, sim_length=100, n_sims=1000, random_state=None, *, prices=None):
     """Simulate future value paths by resampling historical returns.
 
     Each path draws `sim_length` one-period returns, with replacement, from
-    the history in `prices` (a bootstrap) and compounds them. No distribution
+    the history in `values` (a bootstrap) and compounds them. No distribution
     is assumed, so fat tails and skew in the history carry over, but every
     draw is independent: volatility clustering and autocorrelation do not.
 
     Parameters
     ----------
-    prices : pandas.Series or single-column pandas.DataFrame
+    values : pandas.Series or single-column pandas.DataFrame
         Historical prices or portfolio values, one row per bar, oldest first.
-        The bar size of `prices` is the length of one simulated period.
+        The bar size of `values` is the length of one simulated period.
     sim_length : int, default 100
         Number of future periods to simulate per path.
     n_sims : int, default 1000
@@ -27,6 +40,11 @@ def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=
     random_state : int, numpy.random.Generator or None, default None
         Seed or Generator for the draws. An int or a Generator gives
         reproducible paths; None gives a fresh, unseeded Generator.
+    prices : pandas.Series or single-column pandas.DataFrame, optional
+        Deprecated alias for `values`, keyword only.
+
+        .. deprecated:: 0.2.0
+            `prices` will be removed in 1.0.0; use `values` instead.
 
     Returns
     -------
@@ -38,7 +56,14 @@ def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=
     Raises
     ------
     ValueError
-        If `prices` has more than one column.
+        If `values` has more than one column.
+    TypeError
+        If neither or both of `values` and `prices` are given.
+
+    Warns
+    -----
+    DeprecationWarning
+        If `prices` is given.
 
     See Also
     --------
@@ -49,22 +74,23 @@ def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=
 
     Examples
     --------
-    >>> sims = nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000,
+    >>> sims = nonparametric_monte_carlo(values, sim_length=100, n_sims=1000,
     ...                                  random_state=42)
     >>> sims.shape
     (1000, 101)
     """
+    values = _resolve_values(values, prices, 'nonparametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between prices
-    returns = prices.pct_change().dropna()
+    # Calculating the percent change between values
+    returns = values.pct_change().dropna()
 
     # Creating a matrix to store the returns for each
     sims = np.zeros((n_sims, sim_length + 1))
     sims[:,0] = 1
 
     for i in range(n_sims):
-        # Sampling from the prices with replacement
+        # Sampling from the returns with replacement
         ret_sample = returns.sample(n=sim_length, replace=True, random_state=rng).reset_index(drop=True)
         # Obtaining the single period accumulation factors
         acc_factor = ret_sample.to_numpy().flatten() + 1  # ensure 1D array, just in case
@@ -77,8 +103,8 @@ def nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=
 
 
 
-def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None,
-                           return_fit=False):
+def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sims=1000, random_state=None,
+                           return_fit=False, *, prices=None):
     """Simulate future value paths from a distribution fitted to historical returns.
 
     One-period returns are fitted by maximum likelihood to a scipy.stats
@@ -88,9 +114,9 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
 
     Parameters
     ----------
-    prices : pandas.Series or single-column pandas.DataFrame
+    values : pandas.Series or single-column pandas.DataFrame
         Historical prices or portfolio values, one row per bar, oldest first.
-        The bar size of `prices` is the length of one simulated period.
+        The bar size of `values` is the length of one simulated period.
     distribution : scipy.stats continuous distribution or None, default None
         Distribution to fit, e.g. ``stats.t``, ``stats.norm`` or
         ``stats.laplace``. None selects among normal, t and Johnson SU by AIC.
@@ -103,6 +129,11 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
         reproducible paths; None gives a fresh, unseeded Generator.
     return_fit : bool, default False
         If True, also return the fitted distribution; see Returns.
+    prices : pandas.Series or single-column pandas.DataFrame, optional
+        Deprecated alias for `values`, keyword only.
+
+        .. deprecated:: 0.2.0
+            `prices` will be removed in 1.0.0; use `values` instead.
 
     Returns
     -------
@@ -124,6 +155,16 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
             dict of every candidate's AIC by name when `distribution` is
             None, lowest first; otherwise None.
 
+    Raises
+    ------
+    TypeError
+        If neither or both of `values` and `prices` are given.
+
+    Warns
+    -----
+    DeprecationWarning
+        If `prices` is given.
+
     Notes
     -----
     With `distribution=None`, prints each candidate's AIC
@@ -143,16 +184,17 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
     Examples
     --------
     >>> from scipy import stats
-    >>> sims = parametric_monte_carlo(prices, distribution=stats.t,
+    >>> sims = parametric_monte_carlo(values, distribution=stats.t,
     ...                               random_state=42)
-    >>> sims, fit = parametric_monte_carlo(prices, random_state=42, return_fit=True)
+    >>> sims, fit = parametric_monte_carlo(values, random_state=42, return_fit=True)
     >>> fit["Distribution"], fit["AIC"]
     ('johnsonsu', -13480.71...)
     """
+    values = _resolve_values(values, prices, 'parametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between prices
-    returns = prices.pct_change().dropna()
+    # Calculating the percent change between values
+    returns = values.pct_change().dropna()
 
     data = returns.to_numpy().flatten()
 
@@ -200,7 +242,7 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
     names = [n.strip() for n in (distribution.shapes or '').split(',') if n.strip()] + ['loc', 'scale']
     fit = {
         'Distribution': distribution.name,
-        'Parameters': {name: float(value) for name, value in zip(names, params)},
+        'Parameters': {name: float(value) for name, value in zip(names, params, strict=True)},
         'AIC': float(aic(distribution, params)),
         'Candidates': candidate_aics,
     }
@@ -208,8 +250,9 @@ def parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=100
 
 
 
-def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_starts=10,
-                                 sim_length=100, n_sims=1000, random_state=None, return_fit=False):
+def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n_starts=10,
+                                 sim_length=100, n_sims=1000, random_state=None, return_fit=False,
+                                 *, prices=None):
     """Simulate future value paths from a Gaussian hidden Markov model of regimes.
 
     A hidden Markov model is fitted to one-period log returns, each hidden
@@ -222,9 +265,9 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
 
     Parameters
     ----------
-    prices : pandas.Series or single-column pandas.DataFrame
+    values : pandas.Series or single-column pandas.DataFrame
         Historical prices or portfolio values, one row per bar, oldest first.
-        Must be positive (log returns are taken). The bar size of `prices` is
+        Must be positive (log returns are taken). The bar size of `values` is
         the length of one simulated period.
     n_regimes : int or None, default None
         Number of hidden regimes. None fits 1, 2 and 3 regimes and uses the
@@ -247,6 +290,11 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
         Generator.
     return_fit : bool, default False
         If True, also return the fitted model; see Returns.
+    prices : pandas.Series or single-column pandas.DataFrame, optional
+        Deprecated alias for `values`, keyword only.
+
+        .. deprecated:: 0.2.0
+            `prices` will be removed in 1.0.0; use `values` instead.
 
     Returns
     -------
@@ -279,6 +327,13 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
     ValueError
         If `n_regimes` is given and no restart produces a usable fit, or if
         `n_regimes` is None and none of 1, 2 or 3 regimes can be fitted.
+    TypeError
+        If neither or both of `values` and `prices` are given.
+
+    Warns
+    -----
+    DeprecationWarning
+        If `prices` is given.
 
     Notes
     -----
@@ -306,17 +361,18 @@ def regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_star
 
     Examples
     --------
-    >>> sims = regime_switching_monte_carlo(prices, n_regimes=2, bootstrap=True,
+    >>> sims = regime_switching_monte_carlo(values, n_regimes=2, bootstrap=True,
     ...                                     random_state=42)
-    >>> sims, fit = regime_switching_monte_carlo(prices, random_state=42, return_fit=True)
+    >>> sims, fit = regime_switching_monte_carlo(values, random_state=42, return_fit=True)
     >>> fit["Regime Count"]
     3
     >>> fit["Regimes"]["Volatility"]  # calm to turbulent
     """
+    values = _resolve_values(values, prices, 'regime_switching_monte_carlo')
     rng = np.random.default_rng(random_state)
 
     # Calculating log returns as a column vector (hmmlearn expects shape (n_obs, n_features))
-    X = np.log(prices).diff().dropna().to_numpy().reshape(-1, 1)
+    X = np.log(values).diff().dropna().to_numpy().reshape(-1, 1)
 
     def fit(K):
         # Fitting K regimes from several random starts and keeping the highest log-likelihood
