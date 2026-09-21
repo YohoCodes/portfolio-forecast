@@ -4,7 +4,6 @@ import pandas as pd
 from ..utils.periods import PERIODS_PER_YEAR
 from ..utils.trading_dates import _parse_interval
 
-
 # PERIODS_PER_YEAR keyed by the parsed bar size, so any spelling that
 # next_trading_dates accepts ('1D', '5min', a Timedelta, ...) finds its entry
 _PERIODS_BY_BAR = {_parse_interval(key): n for key, n in PERIODS_PER_YEAR.items()}

@@ -3,10 +3,16 @@ import pandas as pd
 import pytest
 from conftest import compounding
 
-from portfolio_forecast.performance import (calculate_actual_yearly_return, calculate_cagr,
-                                            calculate_daily_return, calculate_max_drawdown,
-                                            calculate_sharpe_ratio, calculate_sortino_ratio,
-                                            performance_report, statistical_report)
+from portfolio_forecast.performance import (
+    calculate_actual_yearly_return,
+    calculate_cagr,
+    calculate_daily_return,
+    calculate_max_drawdown,
+    calculate_sharpe_ratio,
+    calculate_sortino_ratio,
+    performance_report,
+    statistical_report,
+)
 from portfolio_forecast.performance.report import _periods_per_year
 from portfolio_forecast.utils import PERIODS_PER_YEAR
 

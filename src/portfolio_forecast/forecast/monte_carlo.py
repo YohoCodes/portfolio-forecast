@@ -242,7 +242,7 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
     names = [n.strip() for n in (distribution.shapes or '').split(',') if n.strip()] + ['loc', 'scale']
     fit = {
         'Distribution': distribution.name,
-        'Parameters': {name: float(value) for name, value in zip(names, params)},
+        'Parameters': {name: float(value) for name, value in zip(names, params, strict=True)},
         'AIC': float(aic(distribution, params)),
         'Candidates': candidate_aics,
     }
