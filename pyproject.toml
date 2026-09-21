@@ -25,7 +25,7 @@ Repository = "https://github.com/YohoCodes/portfolio-forecast"
 Changelog = "https://github.com/YohoCodes/portfolio-forecast/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-# The example notebook, which downloads prices from Yahoo Finance
+# The demo notebooks, which download prices from Yahoo Finance
 notebook = ["ipykernel", "yfinance"]
 test = ["pytest"]
 lint = ["ruff"]

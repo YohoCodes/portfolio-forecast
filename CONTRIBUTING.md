@@ -30,9 +30,9 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -e ".[test,lint]"
 ```
 
-Add `notebook` to the extras (`".[test,lint,notebook]"`) to run `demo.ipynb`.
-The PDF report tests also need `pdflatex` on the PATH; without it they are
-skipped.
+Add `notebook` to the extras (`".[test,lint,notebook]"`) to run the demo
+notebooks. The PDF report tests also need `pdflatex` on the PATH; without it
+they are skipped.
 
 ## Before opening a pull request
 
@@ -101,6 +101,21 @@ Default, Description), then **Returns**, **Raises**, **Notes** and
 - A bug fix comes with a test that fails without the fix.
 - Keep tests fast: small `sim_length` and `n_sims`, and few `n_starts` for
   the regime-switching model.
+
+## Demo notebooks
+
+The `demo_*.ipynb` notebooks share one layout, so follow it in a new demo:
+
+- A title cell, `# **Portfolio Forecast Demo: <Topic>**`, with a sentence on
+  what the demo does and a numbered list of its steps.
+- An `## **Imports**` section first, then one `##` section per step, with
+  `###` for subsections. Headings are bold and in Title Case.
+- Every code cell except the imports starts with a comment saying what it
+  does or why.
+- Single-quoted strings, and seeds passed as
+  `random_state=np.random.default_rng(42)`.
+- Commit the notebook with its outputs, run top to bottom, and with no empty
+  trailing cells. Ruff checks notebooks too.
 
 ## Changing a public signature
 
