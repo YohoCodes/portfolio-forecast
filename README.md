@@ -15,6 +15,8 @@ historical series.
 - [Concepts](#concepts)
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Demos](#demos)
+  - [Installing the demos](#installing-the-demos)
 - [Project layout](#project-layout)
 - [Standardized objects](#standardized-objects)
 - [API reference](#api-reference)
@@ -72,20 +74,10 @@ and python-dateutil. The package does not fetch data itself; the
 LaTeX distribution with `pdflatex` on the PATH: TeX Live, MacTeX on macOS or
 MiKTeX on Windows. Nothing else in the package uses LaTeX.
 
-For local development, from the repo root:
+To run the demo notebooks, see [Demos](#demos).
 
-```bash
-pip install -e ".[notebook]"
-```
-
-The `notebook` extra adds `ipykernel` and `yfinance` for `demo.ipynb`, a worked
-example on ten years of daily AAPL prices from Yahoo Finance: it runs all
-three simulators, plots and compares their paths, prints their statistical
-reports, and compiles a PDF report of the parametric and regime-switching
-results (this last step needs LaTeX).
-
-To run the tests (no network access needed; the PDF tests are skipped
-without `pdflatex`):
+For local development, from the repo root, run the tests (no network access
+needed; the PDF tests are skipped without `pdflatex`):
 
 ```bash
 pip install -e ".[test]"
@@ -137,6 +129,56 @@ compile_statistical_reports({
 
 ---
 
+## Demos
+
+Two Jupyter notebooks work through complete examples on ten years of daily
+prices from Yahoo Finance:
+
+| Notebook | What it does |
+| --- | --- |
+| `demo_simulate_portfolio.ipynb` | Backtests a five-stock buy-and-hold portfolio with [`simulate_buy_and_hold`](#simulate_buy_and_hold), then forecasts its next 100 trading days with [`regime_switching_monte_carlo`](#regime_switching_monte_carlo) |
+| `demo_full_report.ipynb` | Runs all three simulators on AAPL, compares their paths and statistical reports, and compiles a PDF report with [`compile_statistical_reports`](#compile_statistical_reports) |
+
+To read them without installing anything, open them on
+[GitHub](https://github.com/YohoCodes/portfolio-forecast), which shows the
+saved outputs.
+
+### Installing the demos
+
+The notebooks are not part of the `pip install` package, so get them from the
+repository.
+
+1. Clone the repository and create a virtual environment:
+
+   ```bash
+   git clone https://github.com/YohoCodes/portfolio-forecast.git
+   cd portfolio-forecast
+   python -m venv venv
+   source venv/bin/activate        # Windows: venv\Scripts\activate
+   ```
+
+2. Install the package with the `notebook` extra, which adds `yfinance` to
+   download prices and `ipykernel` to run the notebooks:
+
+   ```bash
+   pip install -e ".[notebook]"
+   ```
+
+3. Open a demo. The extra doesn't include Jupyter itself; to use JupyterLab:
+
+   ```bash
+   pip install jupyterlab
+   jupyter lab demo_simulate_portfolio.ipynb
+   ```
+
+   In VS Code, open the notebook and select the `venv` Python as its kernel.
+
+4. Run all cells. Both demos need internet access to download prices, and the
+   last step of `demo_full_report.ipynb` needs LaTeX (see
+   [Installation](#installation)).
+
+---
+
 ## Project layout
 
 The distribution is `portfolio-forecast`; it installs the `portfolio_forecast`
@@ -152,8 +194,10 @@ package.
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
 | `tests/` | `pytest` suite covering every subpackage |
-| `demo.ipynb` | Worked example: all three simulators, their plots and statistical reports, and a PDF report |
+| `demo_full_report.ipynb` | Worked example: all three simulators on one stock, their plots and statistical reports, and a PDF report |
+| `demo_simulate_portfolio.ipynb` | Worked example: backtest a five-stock portfolio, then forecast it with regime-switching Monte Carlo |
 | `CONTRIBUTING.md` | How to set up, the code and docstring conventions, and what a pull request needs |
+| `CHANGELOG.md` | Notable changes in each release |
 
 Each subpackage re-exports its public functions, e.g.
 `from portfolio_forecast.performance import statistical_report`.
@@ -731,7 +775,7 @@ rebalanced, so its weights drift with prices.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `data` | `DataFrame` | — | Historical prices in any layout [`get_closing_prices`](#get_closing_prices) accepts. |
-| `w` | `Series` or array-like | — | Weights: a Series aligned by symbol (missing symbols get zero), or an array matched by column position. Normalized to sum to 1. |
+| `w` | `Series`, `dict` or array-like | — | Weights: a Series or dict aligned by symbol (missing symbols get zero), or an array matched by column position. Normalized to sum to 1. |
 | `br0` | `float` | `1` | Starting portfolio value. |
 
 **Returns** — `(values, dates)`: a `Series` of portfolio values starting at
@@ -740,8 +784,12 @@ rebalanced, so its weights drift with prices.
 **Raises** — `ValueError` if the weights sum to zero or less, or an array of
 weights does not have one entry per symbol.
 
-**Notes** — Symbols with any missing return are dropped, then bars with any
-missing return.
+**Warns** — `UserWarning` naming each symbol dropped for missing prices, with
+how many returns it is missing and the date of its first price.
+
+**Notes** — A gap inside a symbol's history is filled with its last known
+price. A symbol with no price at the start (e.g. listed partway through) is
+dropped entirely, and the remaining weights are renormalized.
 
 **See also** — [`performance_report`](#performance_report).
 
@@ -786,9 +834,11 @@ get_closing_prices(data)
 ```
 
 Select closing prices as a (date × symbol) frame. Accepts MultiIndex columns
-with a `close` field on either level (e.g. from `yfinance.download`), flat
-OHLCV columns for one symbol, or a frame that is already closes. Import from
-`portfolio_forecast.performance.simulate`.
+with a close field on either level (e.g. from `yfinance.download`), flat
+OHLCV columns for one symbol, or a frame that is already closes. Field names
+match case-insensitively, and an adjusted close (`Adj Close`, `adj_close` or
+`adjclose`) is preferred over `Close` because it includes dividends. Import
+from `portfolio_forecast.performance.simulate`.
 
 **Parameters** — `data` (`DataFrame`) prices.
 
@@ -806,6 +856,7 @@ Private functions, listed for completeness.
 | `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
 | `_periods_per_year(interval)` | `performance/report.py` | Look up bars per year for any accepted [`interval`](#interval) spelling |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
+| `_find_close(labels)` | `performance/simulate.py` | The preferred close field among column labels, adjusted close first |
 | `_hold(closing, start_i, end_i, held, w_held)` | `performance/simulate.py` | Growth and drifted weights of a book held between two bars |
 | `_buyable(w_new, quotes)` | `performance/simulate.py` | The book a suggestion can actually buy, renormalized |
 | `_turnover(a, b)` | `performance/simulate.py` | One-way turnover between two books, counting cash |

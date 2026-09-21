@@ -39,8 +39,9 @@ def calculate_daily_return(values):
         ``values[t] / values[t-1] - 1``, one shorter than `values`, with the
         first (undefined) return dropped.
     """
-    # Calculating percentage change in portfolio value
-    daily_returns = values.pct_change().dropna()
+    # Calculating percentage change in portfolio value, measuring a return across a
+    # gap from the last known value (explicit, as pandas 3 no longer fills by default)
+    daily_returns = values.ffill().pct_change(fill_method=None).dropna()
     return daily_returns
 
 
