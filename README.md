@@ -160,7 +160,7 @@ Each subpackage re-exports its public functions, e.g.
 
 ## Standardized objects
 
-### `prices` input
+### `values` input
 
 What the simulators take as history.
 
@@ -255,7 +255,7 @@ are escaped, and a blank line starts a new paragraph.
 #### `nonparametric_monte_carlo`
 
 ```python
-nonparametric_monte_carlo(prices, sim_length=100, n_sims=1000, random_state=None)
+nonparametric_monte_carlo(values, sim_length=100, n_sims=1000, random_state=None, *, prices=None)
 ```
 
 Simulate future paths by resampling historical returns with replacement (a
@@ -266,14 +266,15 @@ skew carry over; every draw is independent, so volatility clustering does not.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `prices` | Series or DataFrame | — | History; see [`prices` input](#prices-input). |
+| `values` | Series or DataFrame | — | History; see [`values` input](#values-input). |
 | `sim_length` | `int` | `100` | Future periods per path. |
 | `n_sims` | `int` | `1000` | Number of paths. |
 | `random_state` | `int`, `Generator` or `None` | `None` | Seed or Generator; an int or Generator gives reproducible paths, `None` a fresh unseeded Generator. |
+| `prices` | Series or DataFrame | `None` | Deprecated alias for `values`, keyword only; warns, and is removed in 1.0.0. |
 
 **Returns** — A [`sims` array](#sims-array) of shape `(n_sims, sim_length + 1)`.
 
-**Raises** — `ValueError` if `prices` has more than one column.
+**Raises** — `ValueError` if `values` has more than one column; `TypeError` if neither or both of `values` and `prices` are given.
 
 **See also** — [`parametric_monte_carlo`](#parametric_monte_carlo),
 [`regime_switching_monte_carlo`](#regime_switching_monte_carlo).
@@ -281,8 +282,8 @@ skew carry over; every draw is independent, so volatility clustering does not.
 #### `parametric_monte_carlo`
 
 ```python
-parametric_monte_carlo(prices, distribution=None, sim_length=100, n_sims=1000, random_state=None,
-                       return_fit=False)
+parametric_monte_carlo(values, distribution=None, sim_length=100, n_sims=1000, random_state=None,
+                       return_fit=False, *, prices=None)
 ```
 
 Simulate future paths from a `scipy.stats` distribution fitted to historical
@@ -292,12 +293,13 @@ returns by maximum likelihood. Each path compounds independent draws.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `prices` | Series or DataFrame | — | History; see [`prices` input](#prices-input). |
+| `values` | Series or DataFrame | — | History; see [`values` input](#values-input). |
 | `distribution` | `scipy.stats` distribution or `None` | `None` | Distribution to fit, e.g. `stats.t`, `stats.norm`, `stats.laplace`. `None` fits normal, t and Johnson SU and uses the lowest AIC. |
 | `sim_length` | `int` | `100` | Future periods per path. |
 | `n_sims` | `int` | `1000` | Number of paths. |
 | `random_state` | `int`, `Generator` or `None` | `None` | As in [`nonparametric_monte_carlo`](#nonparametric_monte_carlo). |
 | `return_fit` | `bool` | `False` | Also return the fitted distribution. |
+| `prices` | Series or DataFrame | `None` | Deprecated alias for `values`, keyword only; warns, and is removed in 1.0.0. |
 
 **Returns** — A [`sims` array](#sims-array) of shape `(n_sims, sim_length + 1)`.
 With `return_fit=True`, a tuple `(sims, fit)`, where `fit` is a `dict`:
@@ -320,8 +322,9 @@ so a draw below −100% can send a path to zero or below;
 #### `regime_switching_monte_carlo`
 
 ```python
-regime_switching_monte_carlo(prices, n_regimes=None, bootstrap=False, n_starts=10,
-                             sim_length=100, n_sims=1000, random_state=None, return_fit=False)
+regime_switching_monte_carlo(values, n_regimes=None, bootstrap=False, n_starts=10,
+                             sim_length=100, n_sims=1000, random_state=None, return_fit=False,
+                             *, prices=None)
 ```
 
 Fit a Gaussian hidden Markov model to log returns, each hidden regime having
@@ -334,7 +337,7 @@ clustering.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `prices` | Series or DataFrame | — | Positive history; see [`prices` input](#prices-input). |
+| `values` | Series or DataFrame | — | Positive history; see [`values` input](#values-input). |
 | `n_regimes` | `int` or `None` | `None` | Number of regimes. `None` fits 1, 2 and 3 and uses the lowest BIC. |
 | `bootstrap` | `bool` | `False` | `False` draws from the regime's fitted normal; `True` resamples the historical returns assigned to that regime, keeping their fat tails. |
 | `n_starts` | `int` | `10` | Random restarts per fit; EM finds only a local optimum, so the best of these is kept. |
@@ -342,6 +345,7 @@ clustering.
 | `n_sims` | `int` | `1000` | Number of paths. |
 | `random_state` | `int`, `Generator` or `None` | `None` | Seed or Generator for the restarts and the draws. |
 | `return_fit` | `bool` | `False` | Also return the fitted model. |
+| `prices` | Series or DataFrame | `None` | Deprecated alias for `values`, keyword only; warns, and is removed in 1.0.0. |
 
 **Returns** — A [`sims` array](#sims-array) of shape `(n_sims, sim_length + 1)`.
 With `return_fit=True`, a tuple `(sims, fit)`, where `fit` is a `dict`:
@@ -795,6 +799,7 @@ Private functions, listed for completeness.
 
 | Function | Module | Role |
 | --- | --- | --- |
+| `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
 | `_periods_per_year(interval)` | `performance/report.py` | Look up bars per year for any accepted [`interval`](#interval) spelling |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
 | `_hold(closing, start_i, end_i, held, w_held)` | `performance/simulate.py` | Growth and drifted weights of a book held between two bars |
