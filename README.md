@@ -92,6 +92,9 @@ pip install -e ".[test]"
 pytest
 ```
 
+To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the code
+and docstring conventions, and what a pull request needs to pass.
+
 ---
 
 ## Quick start
@@ -150,6 +153,7 @@ package.
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
 | `tests/` | `pytest` suite covering every subpackage |
 | `demo.ipynb` | Worked example: all three simulators, their plots and statistical reports, and a PDF report |
+| `CONTRIBUTING.md` | How to set up, the code and docstring conventions, and what a pull request needs |
 
 Each subpackage re-exports its public functions, e.g.
 `from portfolio_forecast.performance import statistical_report`.
