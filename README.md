@@ -191,7 +191,7 @@ package.
 | `src/portfolio_forecast/plotting/paths.py` | Fan charts: [`plot_simulated_paths`](#plot_simulated_paths), [`plot_path_comparison`](#plot_path_comparison) |
 | `src/portfolio_forecast/reporting/pdf.py` | PDF reports: [`compile_statistical_reports`](#compile_statistical_reports) |
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
-| `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table |
+| `src/portfolio_forecast/utils/periods.py` | Bar sizes: [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table, and parsing of every [`interval`](#interval) spelling |
 | `tests/` | `pytest` suite covering every subpackage |
 | `demo_full_report.ipynb` | Worked example: all three simulators on one stock, their plots and statistical reports, and a PDF report |
 | `demo_simulate_portfolio.ipynb` | Worked example: backtest a five-stock portfolio, then forecast it with regime-switching Monte Carlo |
@@ -824,12 +824,14 @@ Private functions, listed for completeness.
 | Function | Module | Role |
 | --- | --- | --- |
 | `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
-| `_periods_per_year(interval)` | `performance/report.py` | Look up bars per year for any accepted [`interval`](#interval) spelling |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
 | `_find_close(labels)` | `performance/simulate.py` | The preferred close field among column labels, adjusted close first |
 | `_label_dates`, `_draw_paths`, `_add_colorbar` | `plotting/paths.py` | Axis labels, one fan of paths, and the colorbar |
 | `_escape`, `_number`, `_slug`, `_interval_table`, `_results_section`, `_validate` | `reporting/pdf.py` | Escape text for LaTeX, format table values, name the file, build the tables, and check the report dictionary |
-| `_parse_interval`, `_infer_interval`, `_next_sessions`, `_next_periodic`, `_next_intraday` | `utils/trading_dates.py` | Parse or infer a bar size, then step forward by sessions, weeks/months or intraday bars |
+| `_bars_per_year(bar_seconds)` | `utils/periods.py` | Bars in a year of regular-hours sessions for an intraday bar size |
+| `_parse_interval(interval)` | `utils/periods.py` | Parse any accepted [`interval`](#interval) spelling into a bar size |
+| `_periods_per_year(interval)`, `_describe_bar(bar)` | `utils/periods.py` | Look up bars per year for any accepted [`interval`](#interval) spelling, explaining in the error why an unsupported one was rejected |
+| `_infer_interval`, `_next_sessions`, `_next_periodic`, `_next_intraday` | `utils/trading_dates.py` | Infer a bar size from the dates, then step forward by sessions, weeks/months or intraday bars |
 
 ---
 
