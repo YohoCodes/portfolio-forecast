@@ -11,14 +11,32 @@ _PERIODS_BY_BAR = {_parse_interval(key): n for key, n in PERIODS_PER_YEAR.items(
 
 def _periods_per_year(interval):
     """Bars per year for `interval`, as a PERIODS_PER_YEAR key ('5 mins',
-    '1 day') or any other spelling next_trading_dates accepts."""
+    '1 day') or any other spelling next_trading_dates accepts ('5min', '5m')."""
+    expected = f"Expected one of: {', '.join(PERIODS_PER_YEAR)}"
     try:
-        return _PERIODS_BY_BAR[_parse_interval(interval)]
-    except (KeyError, ValueError):
+        bar = _parse_interval(interval)
+    except ValueError as e:
         raise ValueError(
-            f"Unsupported interval {interval!r}. "
-            f"Expected one of: {', '.join(PERIODS_PER_YEAR)}"
+            f"Unsupported interval {interval!r}: {e}. {expected}"
         ) from None
+    if bar not in _PERIODS_BY_BAR:
+        raise ValueError(
+            f"Unsupported interval {interval!r}: it reads as {_describe_bar(bar)} "
+            f"bars, which have no bars-per-year entry. {expected}"
+        )
+    return _PERIODS_BY_BAR[bar]
+
+
+def _describe_bar(bar):
+    """A parsed bar size in words, e.g. ('intraday', 90 min) -> '90-minute'."""
+    kind, step = bar
+    if kind == 'intraday':
+        seconds = int(step.total_seconds())
+        for unit, size in (('hour', 3600), ('minute', 60), ('second', 1)):
+            if seconds % size == 0:
+                return f"{seconds // size}-{unit}"
+    unit = {'session': 'day', 'week': 'week', 'month': 'month'}[kind]
+    return f"{step}-{unit}"
 
 
 # Helper function for Daily Returns
@@ -279,7 +297,7 @@ def performance_report(
         Bar size of `values`, used to annualize: a ``PERIODS_PER_YEAR``
         key such as ``'1 day'`` or ``'5 mins'``, or any spelling
         `portfolio_forecast.utils.next_trading_dates` accepts (``'1D'``,
-        ``'5min'``, a Timedelta).
+        ``'5min'``, yfinance's ``'5m'``, a Timedelta).
     risk_free_rate : float, default 0.0
         Annual risk-free rate for the Sharpe and Sortino ratios and the
         downside deviation.
@@ -310,7 +328,8 @@ def performance_report(
     Raises
     ------
     ValueError
-        If `interval` is not a bar size in ``PERIODS_PER_YEAR``.
+        If `interval` cannot be parsed or is not a bar size in
+        ``PERIODS_PER_YEAR``; the message says which.
 
     Notes
     -----

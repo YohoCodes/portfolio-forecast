@@ -237,10 +237,15 @@ The bar size of one period, which the reports use to look up bars per year.
 | --- | --- |
 | [`PERIODS_PER_YEAR`](#periods_per_year) key | `'1 secs'` … `'30 secs'`, `'1 min'` … `'30 mins'`, `'1 hour'` … `'8 hours'`, `'1 day'`, `'1 week'`, `'1 month'` |
 | pandas-style string | `'1D'`, `'1d'`, `'5min'`, `'1h'` |
+| yfinance-style string | `'1m'`, `'5m'`, `'60m'`, `'1h'`, `'1d'`, `'1wk'`, `'1mo'` |
 | `pandas.Timedelta` | `pd.Timedelta(minutes=5)` |
 
-The bar size must be one in `PERIODS_PER_YEAR`; others, such as `'7 mins'`,
-raise `ValueError`.
+A bare `m` means minutes (yfinance) and a bare `M` months (pandas), so `'1m'`
+is a 1-minute bar and `'1M'` a monthly one.
+
+The bar size must be one in `PERIODS_PER_YEAR`; others, such as `'7 mins'` or
+yfinance's `'90m'`, `'5d'` and `'3mo'`, raise `ValueError` naming the bar size
+they were read as.
 
 ### `dates` for simulated paths
 
@@ -723,7 +728,7 @@ skipping weekends, exchange holidays and closed hours. Used to build
 | --- | --- | --- | --- |
 | `dates` | array-like of datetimes | — | Historical bar dates or times, e.g. `prices.index`. |
 | `n_periods` | `int` | — | Number of future periods; zero or less returns an empty index. |
-| `interval` | `str` or `Timedelta` | `None` | Bar size as a bar-size string (`'5 mins'`), pandas string (`'5min'`) or `Timedelta`; `None` infers it from `dates`. |
+| `interval` | `str` or `Timedelta` | `None` | Bar size as a bar-size string (`'5 mins'`), pandas string (`'5min'`), yfinance string (`'5m'`) or `Timedelta`; `None` infers it from `dates`. |
 | `calendar` | `str` | `'XNYS'` | `exchange_calendars` code; XNYS is the NYSE. |
 | `tz` | `str` or `tzinfo` | `None` | Timezone of naive intraday timestamps; defaults to the machine's local timezone. Ignored for daily and longer bars. |
 
