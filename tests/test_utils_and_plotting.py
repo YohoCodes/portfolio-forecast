@@ -7,7 +7,44 @@ import pandas as pd
 import pytest
 
 from portfolio_forecast.plotting import plot_path_comparison, plot_simulated_paths
-from portfolio_forecast.utils import next_trading_dates
+from portfolio_forecast.utils import PERIODS_PER_YEAR, next_trading_dates
+from portfolio_forecast.utils.periods import _periods_per_year
+
+
+class TestIntervals:
+    @pytest.mark.parametrize("interval, expected", [
+        ("1 day", 252), ("1D", 252), ("1d", 252), (pd.Timedelta(days=1), 252),
+        ("5 mins", 19656), ("5min", 19656), (pd.Timedelta(minutes=5), 19656),
+        ("1 hour", 1764), ("1h", 1764), ("60min", 1764),
+        ("1 week", 52), ("1W", 52), ("1 month", 12),
+    ])
+    def test_spellings_resolve_to_the_table(self, interval, expected):
+        assert _periods_per_year(interval) == expected
+
+    @pytest.mark.parametrize("ib, yf", [
+        ("1 min", "1m"), ("2 mins", "2m"), ("5 mins", "5m"), ("15 mins", "15m"),
+        ("30 mins", "30m"), ("1 hour", "60m"), ("1 hour", "1h"),
+        ("1 day", "1d"), ("1 week", "1wk"), ("1 month", "1mo"),
+    ])
+    def test_yfinance_spellings_match_ib(self, ib, yf):
+        assert _periods_per_year(yf) == _periods_per_year(ib)
+
+    def test_bare_m_is_minutes_and_capital_m_is_months(self):
+        assert _periods_per_year("1m") == PERIODS_PER_YEAR["1 min"]
+        assert _periods_per_year("1M") == PERIODS_PER_YEAR["1 month"]
+
+    @pytest.mark.parametrize("interval, reason", [
+        ("7 mins", "7-minute bars"), ("90m", "90-minute bars"),
+        ("3 days", "3-day bars"), ("5d", "5-day bars"), ("3mo", "3-month bars"),
+        ("banana", "Unrecognized interval unit"),
+    ])
+    def test_unsupported_bar_size_raises_with_reason(self, interval, reason):
+        with pytest.raises(ValueError, match=f"Unsupported interval.*{reason}"):
+            _periods_per_year(interval)
+
+    def test_every_table_key_resolves_to_itself(self):
+        for key, n in PERIODS_PER_YEAR.items():
+            assert _periods_per_year(key) == n
 
 
 class TestNextTradingDates:

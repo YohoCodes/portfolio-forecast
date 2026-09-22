@@ -1,50 +1,9 @@
-import re
-
 # Exchange calendar with NYSE holidays, special closures, and early closes
 import exchange_calendars as xcals
 import pandas as pd
 from dateutil.tz import tzlocal
 
-
-def _parse_interval(interval):
-    """
-    Turn a bar size into (kind, step):
-      ('intraday', Timedelta) for bars shorter than a day
-      ('session', n)          for n-day bars, counted in trading sessions
-      ('week', n) / ('month', n)
-    Accepts bar-size strings ('30 secs', '5 mins', '1 hour', '1 day', '1 week', '1 month'),
-    pandas-style strings ('5min', '1h', '1D'), yfinance-style strings ('5m', '1h', '1d',
-    '1wk', '1mo') or a Timedelta.
-    """
-    if isinstance(interval, pd.Timedelta) or hasattr(interval, 'total_seconds'):
-        td = pd.Timedelta(interval)
-        if td % pd.Timedelta(days=1) == pd.Timedelta(0):
-            return 'session', int(td / pd.Timedelta(days=1))
-        return 'intraday', td
-
-    match = re.fullmatch(r'\s*(\d+)?\s*([A-Za-z]+)\s*', str(interval))
-    if not match:
-        raise ValueError(f'Unrecognized interval: {interval!r}')
-    n, unit = int(match.group(1) or 1), match.group(2)
-
-    # A bare 'm' is yfinance's minute and a bare 'M' pandas' month; otherwise
-    # match on the unit's leading letters
-    if unit == 'm':
-        return 'intraday', pd.Timedelta(minutes=n)
-    u = unit.lower()
-    if unit == 'M' or u.startswith('mo'):
-        return 'month', n
-    if u.startswith(('mi', 't')):
-        return 'intraday', pd.Timedelta(minutes=n)
-    if u.startswith('s'):
-        return 'intraday', pd.Timedelta(seconds=n)
-    if u.startswith('h'):
-        return 'intraday', pd.Timedelta(hours=n)
-    if u.startswith('d'):
-        return 'session', n
-    if u.startswith('w'):
-        return 'week', n
-    raise ValueError(f'Unrecognized interval unit: {unit!r}')
+from .periods import _parse_interval
 
 
 def _infer_interval(dates, cal):
