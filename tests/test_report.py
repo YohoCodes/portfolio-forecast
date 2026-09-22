@@ -27,9 +27,25 @@ class TestIntervals:
     def test_spellings_resolve_to_the_table(self, interval, expected):
         assert _periods_per_year(interval) == expected
 
-    @pytest.mark.parametrize("interval", ["7 mins", "3 days", "banana"])
-    def test_unsupported_bar_size_raises(self, interval):
-        with pytest.raises(ValueError, match="Unsupported interval"):
+    @pytest.mark.parametrize("ib, yf", [
+        ("1 min", "1m"), ("2 mins", "2m"), ("5 mins", "5m"), ("15 mins", "15m"),
+        ("30 mins", "30m"), ("1 hour", "60m"), ("1 hour", "1h"),
+        ("1 day", "1d"), ("1 week", "1wk"), ("1 month", "1mo"),
+    ])
+    def test_yfinance_spellings_match_ib(self, ib, yf):
+        assert _periods_per_year(yf) == _periods_per_year(ib)
+
+    def test_bare_m_is_minutes_and_capital_m_is_months(self):
+        assert _periods_per_year("1m") == PERIODS_PER_YEAR["1 min"]
+        assert _periods_per_year("1M") == PERIODS_PER_YEAR["1 month"]
+
+    @pytest.mark.parametrize("interval, reason", [
+        ("7 mins", "7-minute bars"), ("90m", "90-minute bars"),
+        ("3 days", "3-day bars"), ("5d", "5-day bars"), ("3mo", "3-month bars"),
+        ("banana", "Unrecognized interval unit"),
+    ])
+    def test_unsupported_bar_size_raises_with_reason(self, interval, reason):
+        with pytest.raises(ValueError, match=f"Unsupported interval.*{reason}"):
             _periods_per_year(interval)
 
     def test_every_table_key_resolves_to_itself(self):

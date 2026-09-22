@@ -6,6 +6,19 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `interval` accepts yfinance spellings (`'1m'`, `'5m'`, `'60m'`, `'1h'`,
+  `'1d'`, `'1wk'`, `'1mo'`) wherever it accepts a bar size:
+  `statistical_report`, `performance_report` and `next_trading_dates`. A bare
+  `m` is minutes and a bare `M` is still months.
+
+### Changed
+
+- An unsupported `interval` now says why it was rejected: either the unit
+  was not recognized, or the bar size it was read as (e.g. `'90m'` as
+  90-minute bars) has no `PERIODS_PER_YEAR` entry.
+
 ### Removed
 
 - `simulate_rebalancing_MVO`. It backtested weights from a mean-variance
