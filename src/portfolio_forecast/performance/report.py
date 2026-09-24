@@ -253,8 +253,7 @@ def performance_report(
     Parameters
     ----------
     values : pandas.Series
-        Portfolio values, one per bar, oldest first, e.g. from
-        `simulate_buy_and_hold`.
+        Portfolio values, oldest first, e.g. from `simulate_buy_and_hold`.
     dates : pandas.DatetimeIndex or array-like of datetimes
         The date of each value, same length as `values`. Used for the
         calendar-year returns and the displayed calendar span.

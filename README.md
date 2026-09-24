@@ -191,6 +191,7 @@ package.
 | `src/portfolio_forecast/plotting/paths.py` | Fan charts: [`plot_simulated_paths`](#plot_simulated_paths), [`plot_path_comparison`](#plot_path_comparison) |
 | `src/portfolio_forecast/reporting/pdf.py` | PDF reports: [`compile_statistical_reports`](#compile_statistical_reports) |
 | `src/portfolio_forecast/utils/trading_dates.py` | [`next_trading_dates`](#next_trading_dates) |
+| `src/portfolio_forecast/utils/bar_times.py` | [`close_times`](#close_times), the moment each bar closes |
 | `src/portfolio_forecast/utils/periods.py` | Bar sizes: [`PERIODS_PER_YEAR`](#periods_per_year), the bars-per-year table, and parsing of every [`interval`](#interval) spelling |
 | `tests/` | `pytest` suite covering every subpackage |
 | `demo_full_report.ipynb` | Worked example: all three simulators on one stock, their plots and statistical reports, and a PDF report |
@@ -259,6 +260,16 @@ dates = prices.index[-1:].append(next_trading_dates(prices.index, n_periods))
 
 The plots use it to label the x-axis, and
 [`statistical_report`](#statistical_report) to show the calendar span.
+
+Intraday values from [`simulate_buy_and_hold`](#simulate_buy_and_hold) are
+labelled with bar close times, so label the future bars the same way: extend
+the bar starts, then take their [`close_times`](#close_times). The first date
+is then the last value's own label.
+
+```python
+starts = prices.index.append(next_trading_dates(prices.index, n_periods))
+dates = close_times(starts)[len(prices.index) - 1:]
+```
 
 ### Report dictionary
 
@@ -488,7 +499,7 @@ backtest from [`simulate_buy_and_hold`](#simulate_buy_and_hold).
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `values` | `Series` | — | Portfolio values, one per bar, oldest first. |
+| `values` | `Series` | — | Portfolio values, oldest first, e.g. from [`simulate_buy_and_hold`](#simulate_buy_and_hold). |
 | `dates` | `DatetimeIndex` or array-like | — | The date of each value; used for calendar-year returns and the displayed calendar span. |
 | `interval` | `str` or `Timedelta` | — | Bar size of `values`; see [`interval`](#interval). |
 | `risk_free_rate` | `float` | `0.0` | Annual risk-free rate for Sharpe, Sortino and downside deviation. |
@@ -710,7 +721,7 @@ symbols); an emoji, for example, makes LaTeX fail.
 
 ### Trading dates and bar sizes
 
-`from portfolio_forecast.utils import next_trading_dates, PERIODS_PER_YEAR`
+`from portfolio_forecast.utils import next_trading_dates, close_times, PERIODS_PER_YEAR`
 
 #### `next_trading_dates`
 
@@ -744,6 +755,41 @@ its period. Intraday bars follow the session layout learned from the input:
 grid phase, a bar at an off-grid open such as 9:30, and any pre- or
 post-market bars. Early closes are respected.
 
+#### `close_times`
+
+```python
+close_times(index, calendar='XNYS', tz=None)
+```
+
+The moment each bar closes, for an index labelled with bar start times (as
+yfinance and Interactive Brokers label bars). A close, or a value computed
+from it, is only known when its bar ends, so this is the label that says when
+it is true. [`simulate_buy_and_hold`](#simulate_buy_and_hold) uses it for
+intraday values; apply it to future bar starts from
+[`next_trading_dates`](#next_trading_dates) to label forecast paths the same
+way.
+
+**Parameters**
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `index` | array-like of datetimes | — | Bar start times, oldest first. |
+| `calendar` | `str` | `'XNYS'` | `exchange_calendars` code for the session closes. |
+| `tz` | `str` or `tzinfo` | `None` | Timezone of naive intraday times; defaults to the machine's local timezone. |
+
+**Returns** — `DatetimeIndex`, one close per bar. Intraday closes keep the
+input's timezone (or naive wall clock); daily closes are timezone-aware, on the
+exchange's clock.
+
+**Raises** — `ValueError` if a bar falls outside the calendar's sessions.
+
+**Notes** — An intraday bar closes at the next point of its bar grid and no
+later than its session's close: hourly bars from a 9:30 open close at 10:00,
+11:00, …, 16:00, or 13:00 on half-days. The grid is learned from the index, so
+any bar size works and a missing bar doesn't stretch the one before it. Dates
+spaced like daily bars close at their session's close; weekly and monthly
+dates are returned unchanged. An unfinished bar gets its scheduled close.
+
 #### `PERIODS_PER_YEAR`
 
 ```python
@@ -768,11 +814,12 @@ spellings of these sizes; see [`interval`](#interval).
 #### `simulate_buy_and_hold`
 
 ```python
-simulate_buy_and_hold(data, w, br0=1)
+simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None)
 ```
 
-Backtest a fixed-weight portfolio bought at the first close and never
-rebalanced, so its weights drift with prices.
+Backtest a fixed-weight portfolio bought once, at the first bar's close or
+open, and never rebalanced, so its weights drift with prices. Every value is
+labelled with the moment it is true.
 
 **Parameters**
 
@@ -781,21 +828,44 @@ rebalanced, so its weights drift with prices.
 | `data` | `DataFrame` | — | Historical prices in any layout [`get_closing_prices`](#get_closing_prices) accepts. |
 | `w` | `Series`, `dict` or array-like | — | Weights: a Series or dict aligned by symbol (missing symbols get zero), or an array matched by column position. Normalized to sum to 1. |
 | `br0` | `float` | `1` | Starting portfolio value. |
+| `fill` | `"close"` or `"open"` | `"close"` | Buy at the first bar's close (closes only), or at its open, which also counts the first bar's own move. `"open"` needs opens and intraday or daily bars. |
+| `calendar` | `str` or `None` | `'XNYS'` | `exchange_calendars` code for labelling values with [`close_times`](#close_times). `None` keeps the input's labels, for data off any exchange calendar; `"open"` needs a calendar. |
+| `tz` | `str` or `tzinfo` | `None` | Timezone of naive intraday times; defaults to the machine's local timezone. |
 
 **Returns** — `(values, dates)`: a `Series` of portfolio values starting at
-`br0` on the purchase date, and its index.
+`br0` at the purchase, and its index.
 
-**Raises** — `ValueError` if the weights sum to zero or less, or an array of
-weights does not have one entry per symbol.
+| `fill` | First value | Later values | Length |
+| --- | --- | --- | --- |
+| `"close"`, intraday | `br0` at the first bar's close time | Each bar's close time | One per bar |
+| `"close"`, daily or longer | `br0` on the first date | Each bar's date | One per bar |
+| `"open"`, intraday | `br0` at the first bar's start | Each bar's close time | One more than bars |
+| `"open"`, daily | `br0` at the first session's open | Each session's close, timezone-aware | One more than bars |
 
-**Warns** — `UserWarning` naming each symbol dropped for missing prices, with
-how many returns it is missing and the date of its first price.
+**Raises** — `ValueError` if the weights sum to zero or less, an array of
+weights does not have one entry per symbol, `fill` is unknown, or `"open"` is
+given data without opens, without a calendar, or with weekly or longer bars.
+Also if a bar falls outside the calendar's sessions.
 
-**Notes** — A gap inside a symbol's history is filled with its last known
-price. A symbol with no price at the start (e.g. listed partway through) is
-dropped entirely, and the remaining weights are renormalized.
+**Warns** — `UserWarning` naming each symbol dropped for missing prices: with
+`"close"`, how many returns it is missing and the date of its first price;
+with `"open"`, that it has no open on the first bar.
 
-**See also** — [`performance_report`](#performance_report).
+**Notes**
+
+- A gap inside a symbol's history is filled with its last known price. A
+  symbol with no price at the start (e.g. listed partway through) can't be
+  bought, so it is dropped and the remaining weights are renormalized. Whether
+  a symbol is dropped never depends on prices after the purchase.
+- yfinance and Interactive Brokers label bars with their start time, but a
+  bar's close is only known at its end, so intraday values move to
+  [`close_times`](#close_times). A daily date names the whole session, so
+  `"close"` keeps it.
+- With an adjusted close, `"open"` scales each open by its bar's
+  adjusted-to-traded close ratio, so the first return doesn't mix bases.
+
+**See also** — [`performance_report`](#performance_report),
+[`close_times`](#close_times).
 
 #### `get_closing_prices`
 
@@ -825,7 +895,9 @@ Private functions, listed for completeness.
 | --- | --- | --- |
 | `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
 | `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
-| `_find_close(labels)` | `performance/simulate.py` | The preferred close field among column labels, adjusted close first |
+| `_find_field`, `_get_field` | `performance/simulate.py` | Find a price field among column labels (case-insensitive, in order of preference) and select it from any accepted layout |
+| `_get_opening_prices`, `_normalize_weights`, `_buy_at_open` | `performance/simulate.py` | Opens on the closes' price basis, weights aligned and normalized, and the `fill="open"` backtest |
+| `_daily_sessions(dates, calendar)` | `utils/bar_times.py` | Session opens and closes for daily dates, or `None` for weekly and longer spacing |
 | `_label_dates`, `_draw_paths`, `_add_colorbar` | `plotting/paths.py` | Axis labels, one fan of paths, and the colorbar |
 | `_escape`, `_number`, `_slug`, `_interval_table`, `_results_section`, `_validate` | `reporting/pdf.py` | Escape text for LaTeX, format table values, name the file, build the tables, and check the report dictionary |
 | `_bars_per_year(bar_seconds)` | `utils/periods.py` | Bars in a year of regular-hours sessions for an intraday bar size |
