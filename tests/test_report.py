@@ -116,6 +116,16 @@ class TestPerformanceReport:
 
 
 class TestStatisticalReport:
+    def test_display_prints_every_section(self, capsys):
+        rng = np.random.default_rng(1)
+        sims = 100 * np.cumprod(1 + rng.normal(5e-4, 0.01, (50, 253)), axis=1)
+        dates = pd.bdate_range("2025-01-02", periods=253)
+        statistical_report(sims, "1 day", dates=dates, confidence=0.9, display=True)
+        out = capsys.readouterr().out
+        for text in ("SIMULATED PORTFOLIO STATISTICAL REPORT", "Simulated Paths", "Calendar Span",
+                     "90% interval", "Final Bankroll", "Sortino Ratio", "VaR (90%)", "CVaR (90%)"):
+            assert text in out
+
     def test_one_path_matches_performance_report(self, prices):
         # The vectorized per-path metrics use the same definitions
         values = prices["X"] / prices["X"].iloc[0]
@@ -176,13 +186,3 @@ class TestStatisticalReport:
         with pytest.raises(ValueError, match="at least two"):
             statistical_report(np.ones((2, 2)), "1 day")
 
-
-def test_statistical_report_display_prints_every_section(capsys):
-    rng = np.random.default_rng(1)
-    sims = 100 * np.cumprod(1 + rng.normal(5e-4, 0.01, (50, 253)), axis=1)
-    dates = pd.bdate_range("2025-01-02", periods=253)
-    statistical_report(sims, "1 day", dates=dates, confidence=0.9, display=True)
-    out = capsys.readouterr().out
-    for text in ("SIMULATED PORTFOLIO STATISTICAL REPORT", "Simulated Paths", "Calendar Span",
-                 "90% interval", "Final Bankroll", "Sortino Ratio", "VaR (90%)", "CVaR (90%)"):
-        assert text in out

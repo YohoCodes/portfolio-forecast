@@ -12,7 +12,6 @@ uses [Semantic Versioning](https://semver.org/).
   `'1d'`, `'1wk'`, `'1mo'`) wherever it accepts a bar size:
   `statistical_report`, `performance_report` and `next_trading_dates`. A bare
   `m` is minutes and a bare `M` is still months.
-
 - `simulate_buy_and_hold(..., fill="open")` buys at the first bar's open
   instead of its close, so the first bar's own move is counted. The first
   value is `br0` at the first bar's start (daily bars: the session's open),
