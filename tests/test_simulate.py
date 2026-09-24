@@ -108,3 +108,209 @@ class TestBuyAndHold:
     def test_wrong_number_of_positional_weights_raises(self, two_assets):
         with pytest.raises(ValueError, match="3 positional weights for 2 assets"):
             simulate_buy_and_hold(two_assets, [0.2, 0.3, 0.5])
+
+
+class TestNoLookAhead:
+    def test_values_only_use_prices_up_to_their_date(self):
+        # Scrambling every close after a date leaves the values up to it alone
+        rng = np.random.default_rng(0)
+        dates = pd.bdate_range("2025-01-02", periods=60)
+        data = pd.DataFrame(100 * np.exp(np.cumsum(rng.normal(0, 0.01, (60, 3)), axis=0)),
+                            index=dates, columns=["A", "B", "C"])
+        values, _ = simulate_buy_and_hold(data, [0.5, 0.3, 0.2])
+        for cut in (0, 10, 30, 58):
+            scrambled = data.copy()
+            scrambled.iloc[cut + 1:] *= rng.uniform(0.3, 3.0, scrambled.iloc[cut + 1:].shape)
+            again, _ = simulate_buy_and_hold(scrambled, [0.5, 0.3, 0.2])
+            pd.testing.assert_series_equal(values.iloc[:cut + 1], again.iloc[:cut + 1])
+
+    def test_a_later_gap_does_not_change_earlier_values(self, two_assets, recwarn):
+        values, _ = simulate_buy_and_hold(two_assets, [0.5, 0.5])
+        gapped = two_assets.copy()
+        gapped.loc[DATES[4]:, "B"] = np.nan
+        again, _ = simulate_buy_and_hold(gapped, [0.5, 0.5])
+        pd.testing.assert_series_equal(values.iloc[:4], again.iloc[:4])
+        assert not recwarn
+
+    def test_symbol_with_no_prices_is_reported(self, two_assets):
+        with pytest.warns(UserWarning, match=r"C \(5 of 5 returns missing, no prices\)"):
+            simulate_buy_and_hold(two_assets.assign(C=np.nan), {"A": 1.0, "C": 1.0})
+
+
+NY = "America/New_York"
+
+
+def ny(text):
+    return pd.Timestamp(text, tz=NY)
+
+
+def hourly_index(*days):
+    """Hourly bar starts as yfinance and IB label them: 9:30, then 10:00 to 15:00."""
+    return pd.DatetimeIndex([ny(f"{d} {c}") for d in days
+                             for c in ["09:30"] + [f"{h}:00" for h in range(10, 16)]])
+
+
+def ohlc(index, opens, closes):
+    """A yfinance-style (Price, Ticker) frame from {ticker: prices} dicts."""
+    return pd.concat({"Open": pd.DataFrame(opens, index=index),
+                      "Close": pd.DataFrame(closes, index=index)},
+                     axis=1, names=["Price", "Ticker"])
+
+
+@pytest.fixture
+def hourly():
+    """Two sessions of hourly bars; A opens each bar 1 below its close."""
+    index = hourly_index("2025-06-04", "2025-06-05")
+    closes = {"A": 100 + np.arange(14.0), "B": 50 + 0.5 * np.arange(14.0)}
+    opens = {"A": closes["A"] - 1, "B": closes["B"] - 0.25}
+    return ohlc(index, opens, closes)
+
+
+class TestCloseFillLabels:
+    def test_intraday_values_are_labelled_with_their_bar_close(self, hourly):
+        values, dates = simulate_buy_and_hold(hourly, [1, 1])
+        assert dates is values.index
+        assert len(values) == len(hourly)
+        # Bought at the 9:30 bar's close, which is 10:00
+        assert values.index[0] == ny("2025-06-04 10:00")
+        assert values.index[6] == ny("2025-06-04 16:00")
+        assert values.index[-1] == ny("2025-06-05 16:00")
+
+    def test_relabelling_leaves_the_numbers_alone(self, hourly):
+        values, _ = simulate_buy_and_hold(hourly, [1, 1])
+        closes = hourly["Close"]
+        expected = 0.5 * closes["A"] / 100 + 0.5 * closes["B"] / 50
+        np.testing.assert_allclose(values.to_numpy(), expected.to_numpy())
+
+    def test_no_value_carries_the_start_of_its_bar(self, hourly):
+        values, _ = simulate_buy_and_hold(hourly, [1, 1])
+        assert (values.index > hourly.index).all()
+
+    def test_daily_dates_are_kept(self, two_assets):
+        values, _ = simulate_buy_and_hold(two_assets, [0.5, 0.5])
+        assert values.index.equals(DATES)
+
+    def test_calendar_none_keeps_the_input_labels(self, hourly):
+        values, _ = simulate_buy_and_hold(hourly, [1, 1], calendar=None)
+        assert values.index.equals(hourly.index)
+
+    def test_naive_intraday_labels_are_read_in_tz(self, hourly):
+        naive = hourly.tz_localize(None)
+        values, _ = simulate_buy_and_hold(naive, [1, 1], tz=NY)
+        assert values.index.tz is None
+        assert values.index[0] == pd.Timestamp("2025-06-04 10:00")
+
+
+class TestOpenFill:
+    def test_first_value_is_br0_at_the_first_open(self, hourly):
+        values, _ = simulate_buy_and_hold(hourly, [1, 1], br0=10, fill="open")
+        assert values.index[0] == ny("2025-06-04 09:30")
+        assert values.iloc[0] == 10
+        assert len(values) == len(hourly) + 1
+
+    def test_later_values_are_closes_over_the_first_open(self, hourly):
+        values, _ = simulate_buy_and_hold(hourly, [1, 1], fill="open")
+        closes = hourly["Close"]
+        expected = 0.5 * closes["A"] / 99 + 0.5 * closes["B"] / 49.75
+        np.testing.assert_allclose(values.iloc[1:].to_numpy(), expected.to_numpy())
+        assert values.index[1:].equals(
+            pd.DatetimeIndex([ny("2025-06-04 10:00")]).append(hourly.index[2:7])
+            .append(pd.DatetimeIndex([ny("2025-06-04 16:00")]))
+            .append(hourly.index[8:]).append(pd.DatetimeIndex([ny("2025-06-05 16:00")])))
+
+    def test_the_first_bar_return_is_counted(self, hourly):
+        # Close fill starts at the first close; open fill also earns bar 0
+        by_open, _ = simulate_buy_and_hold(hourly, [1, 0], fill="open")
+        assert by_open.iloc[1] == pytest.approx(100 / 99)
+
+    def test_daily_bars_fill_at_the_session_open(self):
+        dates = pd.DatetimeIndex(["2025-11-26", "2025-11-28"])
+        data = ohlc(dates, {"A": [10.0, 11.0]}, {"A": [10.5, 12.0]})
+        values, _ = simulate_buy_and_hold(data, [1.0], fill="open")
+        assert list(values.index) == [ny("2025-11-26 09:30"), ny("2025-11-26 16:00"),
+                                      ny("2025-11-28 13:00")]
+        np.testing.assert_allclose(values.to_numpy(), [1.0, 1.05, 1.2])
+
+    def test_flat_single_symbol_frame(self):
+        dates = pd.DatetimeIndex(["2025-06-04", "2025-06-05"])
+        data = pd.DataFrame({"open": [10.0, 11.0], "close": [11.0, 12.0]}, index=dates)
+        values, _ = simulate_buy_and_hold(data, [1.0], fill="open")
+        np.testing.assert_allclose(values.to_numpy(), [1.0, 1.1, 1.2])
+
+    def test_opens_are_adjusted_like_the_close(self):
+        # A 2:1 adjustment on day 1: the adjusted close is half the close, so
+        # the open must be halved too or the first return reads as -50%
+        dates = pd.DatetimeIndex(["2025-06-04", "2025-06-05"])
+        data = pd.concat({"Open": pd.DataFrame({"A": [20.0, 21.0]}, index=dates),
+                          "Close": pd.DataFrame({"A": [22.0, 24.0]}, index=dates),
+                          "Adj Close": pd.DataFrame({"A": [11.0, 12.0]}, index=dates)},
+                         axis=1, names=["Price", "Ticker"])
+        values, _ = simulate_buy_and_hold(data, [1.0], fill="open")
+        np.testing.assert_allclose(values.to_numpy(), [1.0, 1.1, 1.2])
+
+    def test_a_gap_holds_the_last_quote(self, hourly):
+        gapped = hourly.copy()
+        gapped.iloc[3:5, gapped.columns.get_loc(("Close", "A"))] = np.nan
+        values, _ = simulate_buy_and_hold(gapped, [1, 0], fill="open")
+        assert values.iloc[4] == values.iloc[3] == values.iloc[5]
+
+    def test_a_missing_first_close_holds_the_fill(self, hourly):
+        gapped = hourly.copy()
+        gapped.iloc[0, gapped.columns.get_loc(("Close", "A"))] = np.nan
+        values, _ = simulate_buy_and_hold(gapped, [1, 0], fill="open")
+        assert values.iloc[1] == 1.0
+
+    def test_symbol_without_a_first_open_is_dropped_with_a_warning(self, hourly):
+        gapped = hourly.copy()
+        gapped.iloc[0, gapped.columns.get_loc(("Open", "B"))] = np.nan
+        with pytest.warns(UserWarning, match="B"):
+            values, _ = simulate_buy_and_hold(gapped, {"A": 1.0, "B": 1.0}, fill="open")
+        alone, _ = simulate_buy_and_hold(hourly, {"A": 1.0}, fill="open")
+        pd.testing.assert_series_equal(values, alone)
+
+    def test_later_gap_does_not_drop_a_symbol(self, hourly, recwarn):
+        gapped = hourly.copy()
+        gapped.iloc[-3:, gapped.columns.get_loc(("Close", "B"))] = np.nan
+        values, _ = simulate_buy_and_hold(gapped, [1, 1], fill="open")
+        clean, _ = simulate_buy_and_hold(hourly, [1, 1], fill="open")
+        pd.testing.assert_series_equal(values.iloc[:-3], clean.iloc[:-3])
+        assert not recwarn
+
+    def test_values_only_use_prices_known_by_their_label(self, hourly):
+        # An open is known at its bar's start, a close at its bar's close
+        values, _ = simulate_buy_and_hold(hourly, [0.6, 0.4], fill="open")
+        close_known = values.index[1:]
+        rng = np.random.default_rng(0)
+        for cut in values.index[[0, 3, 7, 12]]:
+            scrambled = hourly.copy()
+            for field, known in (("Open", hourly.index), ("Close", close_known)):
+                rows = np.asarray(known > cut)
+                cols = [c for c in scrambled.columns if c[0] == field]
+                scrambled.loc[rows, cols] *= rng.uniform(0.3, 3, (rows.sum(), len(cols)))
+            again, _ = simulate_buy_and_hold(scrambled, [0.6, 0.4], fill="open")
+            pd.testing.assert_series_equal(values[values.index <= cut],
+                                           again[again.index <= cut])
+
+    def test_weekly_bars_raise(self):
+        weeks = pd.DatetimeIndex(["2025-06-02", "2025-06-09", "2025-06-16"])
+        data = ohlc(weeks, {"A": [1.0, 1, 1]}, {"A": [1.0, 1, 1]})
+        with pytest.raises(ValueError, match="weekly and longer"):
+            simulate_buy_and_hold(data, [1.0], fill="open")
+
+    def test_prices_without_opens_raise(self, two_assets):
+        with pytest.raises(ValueError, match="needs opening prices"):
+            simulate_buy_and_hold(two_assets, [0.5, 0.5], fill="open")
+
+    def test_needs_a_calendar(self, hourly):
+        with pytest.raises(ValueError, match="needs a calendar"):
+            simulate_buy_and_hold(hourly, [1, 1], fill="open", calendar=None)
+
+    def test_unknown_fill_raises(self, hourly):
+        with pytest.raises(ValueError, match="fill must be"):
+            simulate_buy_and_hold(hourly, [1, 1], fill="vwap")
+
+    @pytest.mark.parametrize("w, message", [([1, 1, 1], "positional weights"),
+                                            ([0, 0], "sum to zero")])
+    def test_bad_weights_raise(self, hourly, w, message):
+        with pytest.raises(ValueError, match=message):
+            simulate_buy_and_hold(hourly, w, fill="open")

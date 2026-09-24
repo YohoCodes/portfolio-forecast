@@ -81,6 +81,53 @@ class TestNextTradingDates:
         with pytest.raises(ValueError, match="at least two dates"):
             next_trading_dates([pd.Timestamp("2025-07-03")], 3)
 
+    def test_weekly_bars_keep_first_session_labels(self):
+        # Mondays, except 2025-09-01 (Labor Day) is labelled Tuesday
+        history = pd.DatetimeIndex(["2025-08-18", "2025-08-25", "2025-09-02", "2025-09-08"])
+        out = next_trading_dates(history, 3)
+        assert out.tolist() == [pd.Timestamp(d) for d in ("2025-09-15", "2025-09-22", "2025-09-29")]
+
+    def test_weekly_bars_keep_last_session_labels(self):
+        # Fridays; 2025-07-04 is a holiday, so that week ends Thursday
+        history = pd.DatetimeIndex(["2025-06-20", "2025-06-27", "2025-07-03", "2025-07-11"])
+        out = next_trading_dates(history, 2)
+        assert out.tolist() == [pd.Timestamp("2025-07-18"), pd.Timestamp("2025-07-25")]
+
+    def test_monthly_bars(self):
+        # Month ends; August 2025 ends on a Sunday, so its bar is Friday the 29th
+        history = pd.DatetimeIndex(["2025-05-30", "2025-06-30", "2025-07-31"])
+        out = next_trading_dates(history, 3)
+        assert out.tolist() == [pd.Timestamp(d) for d in ("2025-08-29", "2025-09-30", "2025-10-31")]
+
+    def test_two_month_bars(self):
+        history = pd.DatetimeIndex(["2025-01-31", "2025-03-31", "2025-05-30"])
+        out = next_trading_dates(history, 2)
+        assert out.tolist() == [pd.Timestamp("2025-07-31"), pd.Timestamp("2025-09-30")]
+
+    def test_n_session_bars_step_over_holidays(self):
+        history = pd.DatetimeIndex(["2025-06-26", "2025-06-30", "2025-07-02"])
+        out = next_trading_dates(history, 2)
+        # Every second session: 2025-07-04 is a holiday
+        assert out.tolist() == [pd.Timestamp("2025-07-07"), pd.Timestamp("2025-07-09")]
+
+    def test_timedelta_interval(self):
+        out = next_trading_dates([pd.Timestamp("2025-07-03")], 1, interval=pd.Timedelta(days=1))
+        assert out.tolist() == [pd.Timestamp("2025-07-07")]
+
+    def test_aware_weekly_bars_keep_their_timezone(self):
+        history = pd.DatetimeIndex(["2025-08-18", "2025-08-25"], tz="UTC")
+        assert str(next_trading_dates(history, 1).tz) == "UTC"
+
+    def test_naive_intraday_bars_are_read_in_the_given_timezone(self):
+        history = pd.date_range("2025-03-07 14:30", "2025-03-07 20:55", freq="5min")
+        out = next_trading_dates(history, 1, tz="UTC")
+        # The 9:30 open in UTC on Monday 10 March, after the DST change
+        assert out.tolist() == [pd.Timestamp("2025-03-10 13:30")]
+
+    def test_long_horizons_extend_the_calendar(self):
+        out = next_trading_dates(pd.bdate_range("2025-06-02", periods=5), 600)
+        assert len(out) == 600 and out.is_monotonic_increasing
+
 
 class TestPlots:
     @pytest.fixture(autouse=True)

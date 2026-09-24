@@ -13,11 +13,30 @@ uses [Semantic Versioning](https://semver.org/).
   `statistical_report`, `performance_report` and `next_trading_dates`. A bare
   `m` is minutes and a bare `M` is still months.
 
+- `simulate_buy_and_hold(..., fill="open")` buys at the first bar's open
+  instead of its close, so the first bar's own move is counted. The first
+  value is `br0` at the first bar's start (daily bars: the session's open),
+  then one value per bar close. Opens are scaled onto an adjusted close's
+  basis when there is one.
+- `close_times(index)` in `portfolio_forecast.utils`: the moment each
+  start-labelled bar closes, from the exchange calendar (16:00, or 13:00 on
+  half-days).
+- `simulate_buy_and_hold` takes `calendar` and `tz`, as `next_trading_dates`
+  does.
+
 ### Changed
 
 - An unsupported `interval` now says why it was rejected: either the unit
   was not recognized, or the bar size it was read as (e.g. `'90m'` as
   90-minute bars) has no `PERIODS_PER_YEAR` entry.
+
+### Fixed
+
+- `simulate_buy_and_hold` labelled intraday values with their bar's start
+  time, one bar before the close they were computed from. Intraday values are
+  now labelled with their bar's close time (e.g. an hourly 9:30 bar's value at
+  10:00, the 15:00 bar's at 16:00); the values themselves are unchanged. Daily
+  and longer bars keep their dates. Pass `calendar=None` for the old labels.
 
 ### Removed
 
