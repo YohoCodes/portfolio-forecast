@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-24
+
 ### Added
 
 - `interval` accepts yfinance spellings (`'1m'`, `'5m'`, `'60m'`, `'1h'`,
