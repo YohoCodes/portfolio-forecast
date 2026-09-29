@@ -117,8 +117,10 @@ class TestPerformanceReport:
         # Once divided by a zero-day calendar span
         idx = pd.date_range("2025-03-03 09:30", "2025-03-03 15:55", freq="5min")
         values = compounding(idx, 0.0001)
-        report = performance_report(values, values.index, "5 mins")
+        report = performance_report(values, values.index, "5 mins", tz="America/New_York")
         assert report["Total Years"] == pytest.approx((len(idx) - 1) / 19656)
+        # One session gives one daily return, too few for a volatility
+        assert len(report["Daily Returns"]) == 1 and np.isnan(report["Risk"]["Annualized Volatility"])
 
     def test_matches_the_metric_helpers(self, prices):
         values = prices["X"]
@@ -157,17 +159,19 @@ class TestStatisticalReport:
                        "Sharpe Ratio", "Sortino Ratio"):
             assert per_path[metric] == pytest.approx(single["Risk"][metric]), metric
 
-    def test_cagr_does_not_depend_on_dates(self):
+    def test_cagr_counts_bars_not_calendar_days(self):
         # 100 five-minute bars spanning a weekend: once gave 613.8% vs 237.9%
         sims = np.tile(np.cumprod(np.r_[1, np.full(100, 1.0001)]), (3, 1))
         dates = pd.date_range("2025-03-07 09:30", periods=78, freq="5min").append(
             pd.date_range("2025-03-10 09:30", periods=23, freq="5min"))
-        without = statistical_report(sims, "5 mins")
-        with_dates = statistical_report(sims, "5 mins", dates=dates)
-        assert with_dates["Returns"].loc["CAGR", "Median"] == pytest.approx(
-            without["Returns"].loc["CAGR", "Median"])
-        assert without["Total Days"] is None
-        assert with_dates["Total Days"] == 3
+        report = statistical_report(sims, "5 mins", dates=dates, tz="America/New_York")
+        assert report["Returns"].loc["CAGR", "Median"] == pytest.approx(1.0001 ** 19656 - 1)
+        assert report["Total Days"] == 3
+
+    def test_intraday_sims_without_dates_raise(self):
+        # Per-bar risk figures would count each overnight gap as one bar
+        with pytest.raises(ValueError, match="intraday sims need dates"):
+            statistical_report(np.ones((2, 5)), "5 mins")
 
     def test_tail_risk(self):
         # 101 two-period paths whose total returns are -50%, -49%, ..., +50%

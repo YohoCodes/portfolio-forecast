@@ -1,0 +1,29 @@
+# Golden M05: with no losing bar, the downside is 0, Sortino is NaN and the
+# drawdown is 0.
+#
+# Rule: Sortino divides by the downside deviation. With no return below the
+#   target, it is 0, and Sortino is undefined (NaN) rather than infinite.
+#
+# Setup: four daily values that only rise. rf = 0.
+#
+# Derivation:
+#   Returns: 0.01, 103 / 101 - 1 = 0.019801980198, 104 / 103 - 1 = 0.00970873786408.
+#   Downside deviation 0 -> Downside Volatility 0, Sortino NaN.
+#   Max drawdown 0: every value is a new peak.
+#   mean 0.013170239354; sample std 0.00574510212044;
+#     Sharpe = 0.013170239354 / 0.00574510212044 x 15.8745078664 = 36.3911839763.
+case: M05
+title: With no losing bar, Sortino is NaN and the drawdown is 0
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2026-03-02", 100]
+  - ["2026-03-03", 101]
+  - ["2026-03-04", 103]
+  - ["2026-03-05", 104]
+expected:
+  Period Returns: [0.01, 0.019801980198, 0.00970873786408]
+  Downside Volatility: 0.0
+  Sortino Ratio: .nan
+  Max Drawdown: 0.0
+  Sharpe Ratio: 36.3911839763

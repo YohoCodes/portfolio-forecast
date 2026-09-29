@@ -1,0 +1,33 @@
+# Golden M03: a year's return is measured from the previous year's last value.
+#
+# Rule: the first year runs from its first value. Every later year runs from
+#   the previous year's last value, so the move across New Year is counted
+#   in the new year.
+#
+# Setup: daily values from Mon 2025-12-29 to Mon 2026-01-05 (Jan 1 is a
+#   holiday, and Jan 3-4 a weekend).
+#
+# Derivation:
+#   2025: 105 / 100 - 1 = +5%. Partial (starts in December):
+#         days Dec 29 -> Dec 31 inclusive = 3.
+#   2026: 99.225 / 105 - 1 = -5.5%, from Dec 31's 105. Partial (ends in
+#         January): days Jan 2 -> Jan 5 inclusive = 4.
+#         Measured from Jan 2's 94.5 instead, it would read +5%, missing the
+#         -10% move from Dec 31 to Jan 2.
+#   Total Return = 99.225 / 100 - 1 = -0.00775 = 1.05 x 0.945 - 1: the years chain.
+#   Periods 4; Total Days Dec 29 -> Jan 5 = 7.
+case: M03
+title: A year's return is measured from the previous year's last value
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2025-12-29", 100]
+  - ["2025-12-30", 102]
+  - ["2025-12-31", 105]
+  - ["2026-01-02", 94.5]
+  - ["2026-01-05", 99.225]
+expected:
+  Periods: 4
+  Total Days: 7
+  Total Return: -0.00775
+  Yearly Returns: [[2025, 0.05, 3, false], [2026, -0.055, 4, false]]

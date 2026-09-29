@@ -10,6 +10,26 @@ uses [Semantic Versioning](https://semver.org/).
 
 - `calculate_period_returns(values)` in `portfolio_forecast.performance`: the
   one-period returns of a value series, per bar at the series' interval.
+- `performance_report` and `statistical_report` take `calendar` and `tz`, as
+  `simulate_buy_and_hold` does, to find the trading sessions of intraday
+  values. Both reports also return `"Daily Returns"`.
+
+### Changed
+
+- On intraday bars, `performance_report` and `statistical_report` compute
+  annualized volatility, downside volatility, Sharpe and Sortino from daily
+  returns (session close to session close, annualized with 252) instead of
+  per-bar returns. A bar return across the night holds the whole overnight
+  gap but counted as one bar of trading, which skewed these figures. Daily
+  data gives the same
+  numbers as before, and total return, CAGR and drawdown are unchanged.
+- **Breaking:** `statistical_report` raises `ValueError` for intraday `sims`
+  without `dates`, since it needs them to find the sessions. Pass one date
+  per column, e.g. the last historical date followed by
+  `next_trading_dates`.
+- Documented a limitation: intraday prices from yfinance aren't
+  dividend-adjusted, so an ex-date's price drop shows as a loss in that
+  session's return in `performance_report`'s risk figures.
 
 ### Deprecated
 

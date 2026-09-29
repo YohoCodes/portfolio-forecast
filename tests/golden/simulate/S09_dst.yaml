@@ -1,0 +1,56 @@
+# Golden S09: across spring-forward, labels stay on the New York clock, an
+# hour earlier in UTC.
+#
+# Rule: the bar grid and the 16:00 close are New York times. Bars given in UTC
+#   keep UTC labels, but the closes follow New York's clock change: 16:00 is
+#   21:00 UTC before 2026-03-08 and 20:00 UTC after.
+#
+# Setup: SPY, 2-hour bars in UTC, open fill. br0 = 100,000.
+#   Fri 03-06 (EST, UTC-5): starts 14:30 16:30 18:30 20:30 UTC
+#                           = 09:30 11:30 13:30 15:30 New York.
+#   Mon 03-09 (EDT, UTC-4): starts 13:30 15:30 17:30 19:30 UTC
+#                           = the same New York times.
+#   A grid read in UTC would put Mon's closes an hour late.
+#
+# Derivation: q = 100,000 / 1,000 = 100 shares.
+#   Fri 14:30 UTC  buy at O 1,000                          V = 100,000
+#   Fri 16:30      100 x 1,010                             V = 101,000
+#   Fri 18:30      100 x 1,005                             V = 100,500
+#   Fri 20:30      100 x 1,020                             V = 102,000
+#   Fri 21:00      100 x 1,015  (16:00 EST)                V = 101,500
+#   Mon 15:30      100 x 1,030  (11:30 EDT)                V = 103,000
+#   Mon 17:30      100 x 1,025                             V = 102,500
+#   Mon 19:30      100 x 1,040                             V = 104,000
+#   Mon 20:00      100 x 1,050  (16:00 EDT)                V = 105,000
+case: S09
+title: Across spring-forward, labels stay on the New York clock
+fields: [Open, Close]
+bars_tz: UTC
+bars:  # [start (UTC), open, close]
+  SPY:
+    - ["2026-03-06 14:30", 1000, 1010]
+    - ["2026-03-06 16:30", 1010, 1005]
+    - ["2026-03-06 18:30", 1005, 1020]
+    - ["2026-03-06 20:30", 1020, 1015]
+    - ["2026-03-09 13:30", 1022, 1030]
+    - ["2026-03-09 15:30", 1030, 1025]
+    - ["2026-03-09 17:30", 1025, 1040]
+    - ["2026-03-09 19:30", 1040, 1050]
+weights: {SPY: 1}
+br0: 100000
+fill: open
+interval: 2 hours
+expected:
+  label_tz: UTC
+  values:
+    - ["2026-03-06 14:30", 100000]
+    - ["2026-03-06 16:30", 101000]
+    - ["2026-03-06 18:30", 100500]
+    - ["2026-03-06 20:30", 102000]
+    - ["2026-03-06 21:00", 101500]
+    - ["2026-03-09 15:30", 103000]
+    - ["2026-03-09 17:30", 102500]
+    - ["2026-03-09 19:30", 104000]
+    - ["2026-03-09 20:00", 105000]
+  fill_prices: {SPY: 1000}
+  shares: {SPY: 100}

@@ -3,7 +3,18 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from ..utils.periods import _periods_per_year
+from ..utils.bar_times import _session_dates
+from ..utils.periods import TRADING_DAYS, _parse_interval, _periods_per_year
+
+
+def _session_marks(dates, calendar, tz):
+    """Positions the daily returns run between: the first value, then each
+    session's last value. A first value that is also its session's last
+    counts once, so no zero return is invented."""
+    sessions = _session_dates(dates, calendar, tz)
+    is_mark = np.append(sessions[1:] != sessions[:-1], True)
+    is_mark[0] = True
+    return np.flatnonzero(is_mark)
 
 
 # Helper function for Period Returns
@@ -276,7 +287,7 @@ def calculate_actual_yearly_return(values, dates):
 
 # Main reporting function
 def performance_report(
-    values, dates, interval, risk_free_rate=0.0, display=False
+    values, dates, interval, risk_free_rate=0.0, display=False, calendar="XNYS", tz=None
 ):
     """Performance and risk metrics for one portfolio value series.
 
@@ -286,7 +297,8 @@ def performance_report(
         Portfolio values, oldest first, e.g. from `simulate_buy_and_hold`.
     dates : pandas.DatetimeIndex or array-like of datetimes
         The date of each value, same length as `values`. Used for the
-        calendar-year returns and the displayed calendar span.
+        calendar-year returns, the displayed calendar span and, on intraday
+        bars, to find each trading session.
     interval : str or pandas.Timedelta
         Bar size of `values`, used to annualize: a ``PERIODS_PER_YEAR``
         key such as ``'1 day'`` or ``'5 mins'``, or any spelling
@@ -297,38 +309,71 @@ def performance_report(
         downside deviation.
     display : bool, default False
         If True, also print a formatted report.
+    calendar : str or None, default "XNYS"
+        ``exchange_calendars`` calendar code whose sessions intraday values
+        are grouped into for the daily returns. None groups by each date's
+        own calendar day. Unused for daily and longer bars.
+    tz : str or tzinfo, optional
+        Timezone that naive intraday `dates` are in. Defaults to this
+        machine's local timezone, as in `simulate_buy_and_hold`.
 
     Returns
     -------
     dict
         ``"Period Returns"``
             pandas.Series of one-period returns.
+        ``"Daily Returns"``
+            pandas.Series of the daily returns the risk figures use: on
+            intraday bars, each session's last value over the previous
+            session's; on daily bars, the period returns. None for weekly and
+            longer bars.
         ``"Periods"``
             Number of bars, ``len(values) - 1``.
         ``"Total Days"``
             Calendar days from the first to the last date.
         ``"Total Years"``
-            ``Periods / periods_per_year``, the time every annualized figure
-            uses.
+            ``Periods / periods_per_year``, the time CAGR uses.
         ``"Returns"``
             dict with ``"Initial Bankroll"``, ``"Final Bankroll"``,
             ``"Total Return"``, ``"CAGR"`` and ``"Actual Yearly Returns"``
             (the DataFrame from `calculate_actual_yearly_return`).
         ``"Risk"``
-            dict with ``"Period Volatility"`` (per bar), ``"Annualized
-            Volatility"``, ``"Downside Volatility"`` (annualized),
+            dict with ``"Period Volatility"`` (per bar, not annualized),
+            ``"Annualized Volatility"``, ``"Downside Volatility"`` (annualized),
             ``"Max Drawdown"``, ``"Sharpe Ratio"`` and ``"Sortino Ratio"``.
 
     Raises
     ------
     ValueError
         If `interval` cannot be parsed or is not a bar size in
-        ``PERIODS_PER_YEAR``; the message says which.
+        ``PERIODS_PER_YEAR``; the message says which. Also, on intraday bars,
+        if a date falls outside the calendar's sessions.
 
     Notes
     -----
-    Every annualized figure (CAGR, volatility, Sharpe, Sortino) counts time
-    in bars, so nights, weekends and holidays add no time. ``PERIODS_PER_YEAR``
+    On intraday bars, the annualized volatility, downside volatility, Sharpe
+    and Sortino ratios use daily returns, annualized with 252 sessions a
+    year, with the risk-free rate spread as ``risk_free_rate / 252`` per
+    session. A bar return that spans the night holds the whole overnight gap
+    but is only one bar, so per-bar figures would treat the night as one
+    more bar of trading. A daily return runs from one session's last value
+    to the next and includes the gap, like every other day's. The first
+    session is measured from the first value, so it is a partial session
+    when the series starts after the open (e.g. a fill at the open or a
+    first close mid-session).
+
+    A value belongs to the session whose date it falls on, on the exchange's
+    clock. Extended-hours values join their day's session, so its last value
+    is the post-market one rather than the 16:00 close. A single naive time
+    that is ambiguous in `tz` (the repeated hour when clocks go back) raises;
+    pass timezone-aware dates in that case.
+
+    Intraday prices from yfinance are not dividend-adjusted, so a series
+    spanning an ex-date shows the dividend's price drop as a loss in that
+    session's return. Adjusted daily closes don't have this problem.
+
+    Total return, CAGR and max drawdown use every value. CAGR counts time in
+    bars, so nights, weekends and holidays add no time. ``PERIODS_PER_YEAR``
     assumes regular trading hours; intraday bars that include extended hours
     are annualized with too few bars per year.
 
@@ -337,12 +382,24 @@ def performance_report(
     statistical_report : The same metrics across many simulated paths.
     """
     periods_per_year = _periods_per_year(interval)
+    kind = _parse_interval(interval)[0]
 
     # Calculating return series at the chosen interval
     period_returns = calculate_period_returns(values)
 
+    # The risk figures use daily returns. An intraday bar across the night
+    # holds the whole overnight gap, so per-bar figures would count the night
+    # as one more bar; a session-to-session return includes it like any day.
+    if kind == "intraday":
+        marks = values.ffill().iloc[_session_marks(dates, calendar, tz)]
+        daily_returns = marks.pct_change(fill_method=None).iloc[1:]
+        risk_returns, risk_periods = daily_returns, TRADING_DAYS
+    else:
+        daily_returns = period_returns if kind == "session" else None
+        risk_returns, risk_periods = period_returns, periods_per_year
+
     # Calculating overall summary metrics. Time is counted in bars, the clock
-    # every annualized figure here uses; calendar days are for display only.
+    # CAGR uses; calendar days are for display only.
     initial_bankroll = float(values.iloc[0])
     final_bankroll = float(values.iloc[-1])
     total_return = (final_bankroll / initial_bankroll) - 1
@@ -352,22 +409,22 @@ def performance_report(
     cagr = calculate_cagr(values, periods_per_year)
     yearly_returns = calculate_actual_yearly_return(values, dates)
     period_vol = period_returns.std()
-    ann_vol = period_vol * np.sqrt(periods_per_year)
+    ann_vol = risk_returns.std() * np.sqrt(risk_periods)
     # Same downside definition as calculate_sortino_ratio: every period enters
     # the average, so non-negative bars contribute zero rather than being dropped.
-    excess_returns = period_returns - (risk_free_rate / periods_per_year)
+    excess_returns = risk_returns - (risk_free_rate / risk_periods)
     downside_dev = np.sqrt(
         (excess_returns.clip(upper=0) ** 2).sum() / len(excess_returns)
     )
-    ann_downside_vol = downside_dev * np.sqrt(periods_per_year)
+    ann_downside_vol = downside_dev * np.sqrt(risk_periods)
     sharpe = calculate_sharpe_ratio(
-        period_returns,
-        periods_per_year=periods_per_year,
+        risk_returns,
+        periods_per_year=risk_periods,
         risk_free_rate=risk_free_rate,
     )
     sortino = calculate_sortino_ratio(
-        period_returns,
-        periods_per_year=periods_per_year,
+        risk_returns,
+        periods_per_year=risk_periods,
         risk_free_rate=risk_free_rate,
     )
     max_drawdown = calculate_max_drawdown(values)
@@ -376,6 +433,7 @@ def performance_report(
     # sections are: period context, then returns, then risk.
     report = {
         "Period Returns": period_returns,
+        "Daily Returns": daily_returns,
         "Periods": n_periods,
         "Total Days": total_days,
         "Total Years": total_years,
@@ -421,7 +479,7 @@ def performance_report(
             print(f"    - {year}            : {ret_str}")
 
         print(separator)
-        print(f"{'RISK':^52}")
+        print(f"{'RISK (FROM DAILY RETURNS)' if kind == 'intraday' else 'RISK':^52}")
         print(sub_separator)
         print(f"  Volatility         : {ann_vol:>12.2%}")
         print(f"  Downside Vol       : {ann_downside_vol:>12.2%}")
@@ -449,7 +507,8 @@ def _interval_summary(values, confidence):
 
 # Main statistical reporting function for simulated paths
 def statistical_report(
-    sims, interval, dates=None, risk_free_rate=0.0, confidence=0.95, display=False
+    sims, interval, dates=None, risk_free_rate=0.0, confidence=0.95, display=False,
+    calendar="XNYS", tz=None,
 ):
     """Performance and risk metrics summarized across simulated paths.
 
@@ -468,8 +527,10 @@ def statistical_report(
         `portfolio_forecast.utils.next_trading_dates` accepts.
     dates : array-like of datetimes, optional
         ``n_periods + 1`` dates, one per column of `sims`, e.g. the last
-        historical date followed by `next_trading_dates`. Only used for the
-        calendar span; time is always counted in bars.
+        historical date followed by `next_trading_dates`. Used for the
+        calendar span and, on intraday bars, to find each trading session for
+        the daily returns, so intraday `sims` require it. Time is always
+        counted in bars.
     risk_free_rate : float, default 0.0
         Annual risk-free rate for the Sharpe and Sortino ratios and the
         downside deviation.
@@ -478,17 +539,27 @@ def statistical_report(
         2.5th to 97.5th percentiles, and sets VaR and CVaR at the 5% tail.
     display : bool, default False
         If True, also print a formatted report.
+    calendar : str or None, default "XNYS"
+        ``exchange_calendars`` calendar code whose sessions intraday `dates`
+        are grouped into, as in `performance_report`.
+    tz : str or tzinfo, optional
+        Timezone that naive intraday `dates` are in. Defaults to this
+        machine's local timezone.
 
     Returns
     -------
     dict
         ``"Per Path Metrics"``
             pandas.DataFrame, one row per path, columns ``"Final Bankroll"``,
-            ``"Total Return"``, ``"CAGR"``, ``"Period Volatility"``,
-            ``"Annualized Volatility"``, ``"Downside Volatility"``,
+            ``"Total Return"``, ``"CAGR"``, ``"Period Volatility"`` (per
+            bar, not annualized), ``"Annualized Volatility"``, ``"Downside Volatility"``,
             ``"Max Drawdown"``, ``"Sharpe Ratio"``, ``"Sortino Ratio"``.
         ``"Period Returns"``
             numpy.ndarray of shape ``(n_sims, n_periods)``.
+        ``"Daily Returns"``
+            numpy.ndarray of the daily returns the risk figures use, one row
+            per path: session to session on intraday bars, the period returns
+            on daily bars, None for weekly and longer bars.
         ``"Paths"``, ``"Periods"``
             n_sims and n_periods.
         ``"Total Days"``
@@ -512,11 +583,13 @@ def statistical_report(
     ValueError
         If `interval` is not a supported bar size, `confidence` is not in
         (0, 1), `sims` has fewer than two periods, or `dates` does not have
-        one entry per column of `sims`.
+        one entry per column of `sims`. On intraday bars, also if `dates` is
+        missing or a date falls outside the calendar's sessions.
 
     Notes
     -----
-    Metrics use the same definitions as `performance_report`. A metric that
+    Metrics use the same definitions as `performance_report`, including its
+    daily returns for the risk figures on intraday bars. A metric that
     is undefined on a path (CAGR for a path ending at or below zero, Sharpe
     or Sortino for a path with no variance or no downside) is NaN there and
     left out of that metric's summary.
@@ -556,6 +629,23 @@ def statistical_report(
     # Calculating each path's return series (one row per path)
     period_returns = values[:, 1:] / values[:, :-1] - 1
 
+    # The risk figures use daily returns, as in performance_report. Intraday
+    # paths need dates to find the sessions: per-bar figures would count each
+    # overnight gap as one bar, a known-wrong answer, so there is no fallback.
+    kind = _parse_interval(interval)[0]
+    if kind == "intraday":
+        if dates is None:
+            raise ValueError(
+                "intraday sims need dates to compute the risk figures from daily returns; pass "
+                "one date per column, e.g. the last historical date followed by next_trading_dates"
+            )
+        marks = values[:, _session_marks(dates, calendar, tz)]
+        daily_returns = marks[:, 1:] / marks[:, :-1] - 1
+        risk_returns, risk_periods = daily_returns, TRADING_DAYS
+    else:
+        daily_returns = period_returns if kind == "session" else None
+        risk_returns, risk_periods = period_returns, periods_per_year
+
     # Calculating each path's summary metrics, with the same definitions as
     # performance_report's helpers, vectorized across paths
     initial_bankroll = values[:, 0]
@@ -568,15 +658,18 @@ def statistical_report(
     cagr[positive] = growth[positive] ** (1 / total_years) - 1
 
     period_vol = period_returns.std(axis=1, ddof=1)
-    ann_vol = period_vol * np.sqrt(periods_per_year)
+    # A single daily return has no sample standard deviation
+    risk_vol = (risk_returns.std(axis=1, ddof=1) if risk_returns.shape[1] > 1
+                else np.full(n_sims, np.nan))
+    ann_vol = risk_vol * np.sqrt(risk_periods)
     # Every period enters the downside average; non-negative bars contribute zero
-    excess_returns = period_returns - (risk_free_rate / periods_per_year)
+    excess_returns = risk_returns - (risk_free_rate / risk_periods)
     downside_dev = np.sqrt((np.minimum(excess_returns, 0) ** 2).mean(axis=1))
-    ann_downside_vol = downside_dev * np.sqrt(periods_per_year)
+    ann_downside_vol = downside_dev * np.sqrt(risk_periods)
     mean_excess = excess_returns.mean(axis=1)
     with np.errstate(divide="ignore", invalid="ignore"):
-        sharpe = np.where(period_vol > 0, mean_excess / period_vol, np.nan) * np.sqrt(periods_per_year)
-        sortino = np.where(downside_dev > 0, mean_excess / downside_dev, np.nan) * np.sqrt(periods_per_year)
+        sharpe = np.where(risk_vol > 0, mean_excess / risk_vol, np.nan) * np.sqrt(risk_periods)
+        sortino = np.where(downside_dev > 0, mean_excess / downside_dev, np.nan) * np.sqrt(risk_periods)
     running_max = np.maximum.accumulate(values, axis=1)
     max_drawdown = (values / running_max - 1).min(axis=1)
 
@@ -616,6 +709,7 @@ def statistical_report(
     report = {
         "Per Path Metrics": per_path,
         "Period Returns": period_returns,
+        "Daily Returns": daily_returns,
         "Paths": n_sims,
         "Periods": n_periods,
         "Total Days": total_days,
@@ -662,7 +756,7 @@ def statistical_report(
         print(row("Total Return", returns_summary.loc["Total Return"], ".2%"))
         print(row("CAGR", returns_summary.loc["CAGR"], ".2%"))
         print(separator)
-        print(f"{'RISK':^{width}}")
+        print(f"{'RISK (FROM DAILY RETURNS)' if kind == 'intraday' else 'RISK':^{width}}")
         print(sub_separator)
         print(column_header)
         print(sub_separator)

@@ -1,0 +1,29 @@
+# Golden M02: the risk-free rate is spread per bar, and moves Sharpe and the
+# downside target but not volatility.
+#
+# Setup: M01's series with rf = 5.04% a year, so the per-bar rate is
+#   0.0504 / 252 = 0.0002 exactly.
+#
+# Derivation:
+#   Excess returns: 0.0998, -0.1002, 0.0998, -0.0402; mean 0.015 - 0.0002 = 0.0148.
+#   Volatility uses the raw returns and is unchanged: 1.60586425329.
+#   Sharpe = 0.0148 / 0.10115993937 x 15.8745078664 = 2.32248771486.
+#   Downside: shortfalls below 0.0002 per bar are -0.1002 and -0.0402;
+#     (0.01004004 + 0.00161604) / 4 = 0.00291402; sqrt = 0.0539816636;
+#     x 15.8745078664 = 0.856932342720.
+#   Sortino = 0.0148 / 0.0539816636 x 15.8745078664 = 4.35226891794.
+case: M02
+title: The risk-free rate is spread per bar and moves Sharpe and the downside target
+interval: 1 day
+risk_free_rate: 0.0504
+values:
+  - ["2026-03-02", 100000]
+  - ["2026-03-03", 110000]
+  - ["2026-03-04", 99000]
+  - ["2026-03-05", 108900]
+  - ["2026-03-06", 104544]
+expected:
+  Annualized Volatility: 1.60586425329
+  Downside Volatility: 0.856932342720
+  Sharpe Ratio: 2.32248771486
+  Sortino Ratio: 4.35226891794

@@ -1,0 +1,78 @@
+# Golden S04: intraday values sit at bar closes, and the overnight gap lands
+# in the next day's first bar.
+#
+# Rule: bars are labelled by their start (as yfinance and IB do). With
+#   fill="open", the first value is br0 at the first bar's start, then one
+#   value per bar at its close. The close of a 2-hour bar is 2 hours after its
+#   start, cut off at the session's 16:00 close. Nothing is labelled 09:30 on
+#   Tue: the move from Mon's close through Tue's open to Tue's first close is
+#   one period.
+#
+# Setup: SPY, 2-hour bars starting 09:30, 11:30, 13:30, 15:30 (the last one a
+#   30-minute stub), naive New York times. br0 = 100,000.
+#
+# Derivation: q = 100,000 / 500 = 200 shares.
+#   Mon 09:30  buy at O 500                           V = 100,000
+#   Mon 11:30  200 x 505                              V = 101,000
+#   Mon 13:30  200 x 502                              V = 100,400
+#   Mon 15:30  200 x 510                              V = 102,000
+#   Mon 16:00  200 x 508  (the stub closes at 16:00)  V = 101,600
+#   Tue 11:30  200 x 497: gap 508 -> 500, bar 500 -> 497
+#                                                     V =  99,400
+#   Tue 13:30  200 x 503                              V = 100,600
+#   Tue 15:30  200 x 506                              V = 101,200
+#   Tue 16:00  200 x 512                              V = 102,400
+#
+# Report ("2 hours": 4 bars a session, 252 x 4 = 1,008 a year):
+#   8 periods, one per bar; years = 8 / 1,008 = 0.00793650793651.
+#   Tue's first return 99,400 / 101,600 - 1 = -0.0216535433071 holds the gap.
+#   Total Return 102,400 / 100,000 - 1 = 0.024.
+#   Returns, V[t] / V[t-1] - 1:
+#     0.01, -0.00594059405941, 0.0159362549801, -0.00392156862745,
+#     -0.0216535433071, 0.0120724346076, 0.00596421471173, 0.0118577075099.
+#   Risk figures use session returns, the gap included:
+#     Mon: 101,600 / 100,000 (the 09:30 fill) - 1 = 0.016
+#     Tue: 102,400 / 101,600 - 1                  = 0.00787401574803
+#   Sample std of the two = |0.016 - 0.00787401574803| / sqrt(2)
+#     = 0.00574593856838; Annualized Volatility = x sqrt(252) = 0.0912139470036.
+case: S04
+title: Intraday values sit at bar closes; the overnight gap lands in the next day's first bar
+fields: [Open, Close]
+bars_tz: null
+bars:  # [start, open, close]
+  SPY:
+    - ["2026-03-02 09:30", 500, 505]
+    - ["2026-03-02 11:30", 505, 502]
+    - ["2026-03-02 13:30", 502, 510]
+    - ["2026-03-02 15:30", 510, 508]
+    - ["2026-03-03 09:30", 500, 497]
+    - ["2026-03-03 11:30", 497, 503]
+    - ["2026-03-03 13:30", 503, 506]
+    - ["2026-03-03 15:30", 506, 512]
+weights: {SPY: 1}
+br0: 100000
+fill: open
+tz: America/New_York
+interval: 2 hours
+expected:
+  label_tz: null
+  values:
+    - ["2026-03-02 09:30", 100000]
+    - ["2026-03-02 11:30", 101000]
+    - ["2026-03-02 13:30", 100400]
+    - ["2026-03-02 15:30", 102000]
+    - ["2026-03-02 16:00", 101600]
+    - ["2026-03-03 11:30",  99400]
+    - ["2026-03-03 13:30", 100600]
+    - ["2026-03-03 15:30", 101200]
+    - ["2026-03-03 16:00", 102400]
+  fill_prices: {SPY: 500}
+  shares: {SPY: 200}
+  report:
+    Period Returns: [0.01, -0.00594059405941, 0.0159362549801, -0.00392156862745,
+                     -0.0216535433071, 0.0120724346076, 0.00596421471173, 0.0118577075099]
+    Periods: 8
+    Total Years: 0.00793650793651
+    Total Return: 0.024
+    Daily Returns: [0.016, 0.00787401574803]
+    Annualized Volatility: 0.0912139470036

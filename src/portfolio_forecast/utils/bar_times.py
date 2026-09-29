@@ -29,6 +29,36 @@ def _daily_sessions(dates, calendar='XNYS'):
     return opens.rename(dates.name), closes.rename(dates.name)
 
 
+def _session_dates(index, calendar='XNYS', tz=None):
+    """The exchange session each time in `index` belongs to: its date on the
+    exchange's clock, as naive midnights. Naive times are read in `tz`
+    (default: this machine's local timezone), as in close_times. With no
+    calendar, each time's own date. Raises ValueError for a time whose
+    exchange date isn't a session.
+
+    The date is read on the exchange's clock because a session can straddle
+    midnight elsewhere: New York's 16:00 close is 01:00 the next day in Dubai.
+    """
+    index = pd.DatetimeIndex(index)
+    if calendar is None:
+        return (index if index.tz is None else index.tz_localize(None)).normalize()
+    if index.tz is None:
+        index = index.tz_localize(tz or tzlocal(), ambiguous='infer',
+                                  nonexistent='shift_forward')
+    cal = xcals.get_calendar(calendar,
+                             start=index.min().tz_convert(None).normalize() - pd.Timedelta(days=7),
+                             end=index.max().tz_convert(None).normalize() + pd.Timedelta(days=7))
+    session = index.tz_convert(cal.tz).tz_localize(None).normalize()
+    not_session = ~session.isin(cal.sessions)
+    if not_session.any():
+        raise ValueError(
+            f"{not_session.sum()} time(s) fall outside {calendar} sessions, "
+            f"first {index[not_session][0]}; pass tz if naive times aren't on "
+            "this machine's clock"
+        )
+    return session
+
+
 def close_times(index, calendar='XNYS', tz=None):
     """The time each bar of a start-labelled index closes.
 

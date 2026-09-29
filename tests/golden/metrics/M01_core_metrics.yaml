@@ -1,0 +1,49 @@
+# Golden M01: the core metrics on one small daily series.
+#
+# Setup: five daily values, Mon 2026-03-02 to Fri 03-06. rf = 0.
+#   252 bars a year; sqrt(252) = 15.8745078664.
+#
+# Derivation:
+#   Returns: 110,000 / 100,000 - 1 = +0.10; 99,000 / 110,000 - 1 = -0.10;
+#            108,900 / 99,000 - 1 = +0.10; 104,544 / 108,900 - 1 = -0.04.
+#   Periods 4; Total Years = 4 / 252 = 0.015873015873; Total Days Mon -> Fri = 4.
+#   Total Return = 104,544 / 100,000 - 1 = 0.04544.
+#   CAGR = 1.04544 ^ (252 / 4) - 1 = 1.04544 ^ 63 - 1 = 15.4378156719.
+#   Mean = (0.1 - 0.1 + 0.1 - 0.04) / 4 = 0.015.
+#   Sample std: deviations 0.085, -0.115, 0.085, -0.055;
+#     squares 0.007225 + 0.013225 + 0.007225 + 0.003025 = 0.0307;
+#     / 3 = 0.01023333; sqrt = 0.10115993937.
+#   Annualized Volatility = 0.10115993937 x 15.8745078664 = 1.60586425329.
+#   Downside deviation over all 4 bars: (0.1^2 + 0.04^2) / 4 = 0.0029;
+#     sqrt = 0.0538516481; x 15.8745078664 = 0.854868410927.
+#   Sharpe = 0.015 / 0.10115993937 x 15.8745078664 = 2.35387268398.
+#   Sortino = 0.015 / 0.0538516481 x 15.8745078664 = 4.42173315996.
+#   Max drawdown: peak 110,000, trough 99,000: 99,000 / 110,000 - 1 = -0.10.
+#     (Fri's 104,544 is only -4.96% below the peak.)
+#   2026 is partial (starts in March): return 0.04544, days Mon -> Fri inclusive = 5.
+case: M01
+title: The core metrics on one small daily series
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2026-03-02", 100000]
+  - ["2026-03-03", 110000]
+  - ["2026-03-04", 99000]
+  - ["2026-03-05", 108900]
+  - ["2026-03-06", 104544]
+expected:
+  Period Returns: [0.1, -0.1, 0.1, -0.04]
+  Periods: 4
+  Total Days: 4
+  Total Years: 0.015873015873
+  Initial Bankroll: 100000
+  Final Bankroll: 104544
+  Total Return: 0.04544
+  CAGR: 15.4378156719
+  Period Volatility: 0.10115993937
+  Annualized Volatility: 1.60586425329
+  Downside Volatility: 0.854868410927
+  Max Drawdown: -0.1
+  Sharpe Ratio: 2.35387268398
+  Sortino Ratio: 4.42173315996
+  Yearly Returns: [[2026, 0.04544, 5, false]]

@@ -99,6 +99,12 @@ Default, Description), then **Returns**, **Raises**, **Notes** and
 - Test names state the behaviour being checked:
   `test_prices_warns_and_matches_values`, not `test_prices_2`.
 - A bug fix comes with a test that fails without the fix.
+- `tests/golden/` holds hand-derived cases: tiny price tables with every
+  expected value worked out in the file's comments, never taken from the
+  package's output. A change to how values or metrics are computed adds a
+  case there. An existing case is never edited to make the code pass; if its
+  derivation is wrong, fix it in a separate commit that says why. The format
+  is in [tests/golden/README.md](tests/golden/README.md).
 - Keep tests fast: small `sim_length` and `n_sims`, and few `n_starts` for
   the regime-switching model.
 

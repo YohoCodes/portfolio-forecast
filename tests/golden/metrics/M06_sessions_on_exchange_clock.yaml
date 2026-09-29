@@ -1,0 +1,38 @@
+# Golden M06: values labelled in Dubai time still group into New York
+# sessions, not Dubai calendar dates.
+#
+# Rule: a value belongs to the exchange session on whose date it falls on
+#   the exchange's clock (XNYS: New York). Naive labels are read in `tz`.
+#
+# Setup: M04's values, labelled in naive Dubai time (UTC+4). Before the US
+#   clock change on 03-08, New York is UTC-5, so Dubai is 9 hours ahead:
+#   10:30 -> 19:30, 13:30 -> 22:30, and the 16:00 close -> 01:00 the next
+#   day. rf = 0.
+#
+# Derivation: in New York time these are exactly M04's values, so the
+#   session returns are M04's: +0.01, -0.01, +0.03, and so are the figures.
+#
+# Grouped by Dubai calendar date instead, each 01:00 close would join the
+#   next day: 03-02 ends at 103, 03-03 at 98, 03-04 at 104, 03-05 at
+#   102.9897. That gives returns +3%, -4.85%, +6.12%, -0.97% and a Sharpe of
+#   2.74, not 7.94.
+case: M06
+title: Labels in Dubai time still group into New York sessions
+interval: 1h
+tz: Asia/Dubai
+risk_free_rate: 0.0
+values:
+  - ["2026-03-02 19:30", 100]
+  - ["2026-03-02 22:30", 103]
+  - ["2026-03-03 01:00", 101]
+  - ["2026-03-03 19:30", 96]
+  - ["2026-03-03 22:30", 98]
+  - ["2026-03-04 01:00", 99.99]
+  - ["2026-03-04 19:30", 101]
+  - ["2026-03-04 22:30", 104]
+  - ["2026-03-05 01:00", 102.9897]
+expected:
+  Daily Returns: [0.01, -0.01, 0.03]
+  Annualized Volatility: 0.317490157328
+  Sharpe Ratio: 7.93725393319
+  Sortino Ratio: 27.4954541697

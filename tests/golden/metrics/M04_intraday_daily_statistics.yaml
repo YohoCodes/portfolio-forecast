@@ -1,0 +1,59 @@
+# Golden M04: on hourly bars, the risk figures come from daily returns.
+#
+# Rule (BacktestingPipeline, CLIENT_SPECS §4.6 and §8): statistics use the
+#   session return R_d = V at d's last value / V at (d-1)'s last value - 1,
+#   which includes the overnight gap. The first session is measured from the
+#   first value. Volatility, downside, Sharpe and Sortino are annualized with
+#   252 sessions a year. Total return and drawdown use the full series.
+#
+# Setup: hourly values, three per session (10:30, 13:30 and the 16:00
+#   close), naive New York times, Mon 03-02 to Wed 03-04. rf = 0. The series
+#   is deliberately sparse (not every hourly bar), so it doesn't check CAGR,
+#   which counts bars; S04 checks that clock on a full bar grid.
+#
+# Derivation:
+#   Session returns:
+#     Mon: 101 / 100 (Mon 10:30, the first value) - 1          = +0.01
+#     Tue:  99.99 / 101 - 1   (Tue's -5% open is inside this)   = -0.01
+#     Wed: 102.9897 / 99.99 - 1                                 = +0.03
+#   mean 0.01; deviations 0, -0.02, +0.02; sum of squares 0.0008;
+#     / 2 = 0.0004; sample std = 0.02.
+#   Annualized Volatility = 0.02 x sqrt(252) = 0.317490157328.
+#   Downside: sqrt(0.01^2 / 3) = 0.00577350269190;
+#     x sqrt(252) = 0.0916515138991.
+#   Sharpe = 0.01 / 0.02 x sqrt(252) = 7.93725393319.
+#   Sortino = 0.01 / 0.00577350269190 x sqrt(252) = 27.4954541697.
+#   Period Volatility stays per bar: the sample std of the 8 hourly returns,
+#     0.0280874839809.
+#   Total Return = 102.9897 / 100 - 1 = 0.029897.
+#   Max drawdown: peak 103 (Mon 13:30), trough 96 (Tue 10:30): 96 / 103 - 1
+#     = -0.0679611650485.
+#
+# The old rule annualized the 8 hourly returns with sqrt(1,764) and gave
+#   an annualized volatility of 1.18, nearly four times this: the overnight
+#   drop counted as one ordinary hour.
+case: M04
+title: On hourly bars, the risk figures come from daily returns
+interval: 1h
+tz: America/New_York
+risk_free_rate: 0.0
+values:
+  - ["2026-03-02 10:30", 100]
+  - ["2026-03-02 13:30", 103]
+  - ["2026-03-02 16:00", 101]
+  - ["2026-03-03 10:30", 96]
+  - ["2026-03-03 13:30", 98]
+  - ["2026-03-03 16:00", 99.99]
+  - ["2026-03-04 10:30", 101]
+  - ["2026-03-04 13:30", 104]
+  - ["2026-03-04 16:00", 102.9897]
+expected:
+  Daily Returns: [0.01, -0.01, 0.03]
+  Periods: 8
+  Total Return: 0.029897
+  Period Volatility: 0.0280874839809
+  Annualized Volatility: 0.317490157328
+  Downside Volatility: 0.0916515138991
+  Sharpe Ratio: 7.93725393319
+  Sortino Ratio: 27.4954541697
+  Max Drawdown: -0.0679611650485

@@ -1,0 +1,46 @@
+# Golden S08: on a 13:00 half-day, the last bar's value is labelled 13:00.
+#
+# Rule: an intraday value is labelled with its bar's close, and no bar closes
+#   after its session does. Fri 2026-11-27, the day after Thanksgiving, closes
+#   at 13:00, so its 11:30 bar closes at 13:00, not 13:30. Thu 11-26 is a
+#   holiday with no bars.
+#
+# Setup: SPY, 2-hour bars starting 09:30, 11:30, 13:30, 15:30, naive New York
+#   times, close fill. br0 = 100,000.
+#
+# Derivation: q = 100,000 / 400 = 250 shares, bought at the close of Wed's
+#   first bar (11:30).
+#   Wed 11:30  buy at C 400                          V = 100,000
+#   Wed 13:30  250 x 404                             V = 101,000
+#   Wed 15:30  250 x 402                             V = 100,500
+#   Wed 16:00  250 x 406  (the 15:30 stub)           V = 101,500
+#   Fri 11:30  250 x 410                             V = 102,500
+#   Fri 13:00  250 x 412  (the half-day's close)     V = 103,000
+case: S08
+title: On a 13:00 half-day the last value is labelled 13:00
+fields: [Close]
+bars_tz: null
+bars:  # [start, close]
+  SPY:
+    - ["2026-11-25 09:30", 400]
+    - ["2026-11-25 11:30", 404]
+    - ["2026-11-25 13:30", 402]
+    - ["2026-11-25 15:30", 406]
+    - ["2026-11-27 09:30", 410]
+    - ["2026-11-27 11:30", 412]
+weights: {SPY: 1}
+br0: 100000
+fill: close
+tz: America/New_York
+interval: 2 hours
+expected:
+  label_tz: null
+  values:
+    - ["2026-11-25 11:30", 100000]
+    - ["2026-11-25 13:30", 101000]
+    - ["2026-11-25 15:30", 100500]
+    - ["2026-11-25 16:00", 101500]
+    - ["2026-11-27 11:30", 102500]
+    - ["2026-11-27 13:00", 103000]
+  fill_prices: {SPY: 400}
+  shares: {SPY: 250}

@@ -1,0 +1,59 @@
+# Golden S03: an open fill on daily bars starts at the 09:30 open and counts
+# the first day's own move.
+#
+# Rule: with fill="open", the book is bought at the first bar's open and is
+#   worth br0 there. On daily bars that value is labelled with the session's
+#   open (09:30 New York), then each value with its session's close (16:00).
+#   There is one value more than bars, so one period per bar.
+#
+# Setup: A and B, daily bars. br0 = 100,000. w = 60% / 40%.
+#
+# Derivation: q_A = 60,000 / 95 = 631.578947368; q_B = 40,000 / 52 = 769.230769231.
+#   Mon 09:30  buy at O                                      V = 100,000
+#   Mon 16:00  631.578947368 x 100 + 769.230769231 x 50      V = 101,619.433198381
+#   Tue 16:00  631.578947368 x 110 + 769.230769231 x 45      V = 104,089.068825911
+#   Wed 16:00  631.578947368 x 120 + 769.230769231 x 60      V = 121,943.319838057
+#   A close fill would start at Mon's close and miss Mon's move entirely.
+#
+# Report (daily, 252 bars a year):
+#   3 periods, one per bar; the first is Mon's open -> close:
+#     101,619.433198381 / 100,000 - 1 = 0.0161943319838.
+#   Tue: 104,089.068825911 / 101,619.433198381 - 1 = 0.0243027888446.
+#   Wed: 121,943.319838057 / 104,089.068825911 - 1 = 0.171528588098.
+#   Total Return 0.219433198381; CAGR = 1.219433198381 ^ 84 - 1 = 17269237.9432.
+#   Total Days: Mon 09:30 -> Wed 16:00 is 2 days 6.5 hours = 2.
+#   2026 (partial): days = 2 + 1 = 3.
+case: S03
+title: An open fill starts at the 09:30 open and counts the first day's move
+fields: [Open, Close]
+bars_tz: null
+bars:  # [date, open, close]
+  A:
+    - ["2026-03-02",  95, 100]
+    - ["2026-03-03", 105, 110]
+    - ["2026-03-04", 118, 120]
+  B:
+    - ["2026-03-02", 52, 50]
+    - ["2026-03-03", 46, 45]
+    - ["2026-03-04", 58, 60]
+weights: {A: 0.6, B: 0.4}
+br0: 100000
+fill: open
+interval: 1 day
+expected:
+  label_tz: America/New_York
+  values:
+    - ["2026-03-02 09:30", 100000]
+    - ["2026-03-02 16:00", 101619.433198381]
+    - ["2026-03-03 16:00", 104089.068825911]
+    - ["2026-03-04 16:00", 121943.319838057]
+  fill_prices: {A: 95, B: 52}
+  shares: {A: 631.578947368, B: 769.230769231}
+  report:
+    Period Returns: [0.0161943319838, 0.0243027888446, 0.171528588098]
+    Periods: 3
+    Total Days: 2
+    Total Years: 0.0119047619048
+    Total Return: 0.219433198381
+    CAGR: 17269237.9432
+    Yearly Returns: [[2026, 0.219433198381, 3, false]]

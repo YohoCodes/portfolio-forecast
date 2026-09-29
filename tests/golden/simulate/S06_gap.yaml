@@ -1,0 +1,44 @@
+# Golden S06: a missing price holds its mark, and the next price carries the
+# whole move.
+#
+# Rule: a gap inside a symbol's history is filled with its last known price.
+#   The symbol stays in the book (it had a price at the fill), so nothing is
+#   dropped and no warning is raised.
+#
+# Setup: A and B, daily bars, close fill, 50% / 50%. br0 = 100,000. A has no
+#   close on Tue.
+#
+# Derivation: q_A = 50,000 / 100 = 500; q_B = 50,000 / 50 = 1,000.
+#   Mon  buy at C: 500 x 100 + 1,000 x 50                 V = 100,000
+#   Tue  A held at 100: 500 x 100 + 1,000 x 51            V = 101,000
+#   Wed  A's 100 -> 104 all lands here: 500 x 104 + 52,000
+#                                                         V = 104,000
+#   Thu  500 x 102 + 1,000 x 53                           V = 104,000
+case: S06
+title: A missing price holds its mark and the next price carries the move
+fields: [Close]
+bars_tz: null
+bars:  # [date, close]
+  A:
+    - ["2026-03-02", 100]
+    - ["2026-03-03", null]
+    - ["2026-03-04", 104]
+    - ["2026-03-05", 102]
+  B:
+    - ["2026-03-02", 50]
+    - ["2026-03-03", 51]
+    - ["2026-03-04", 52]
+    - ["2026-03-05", 53]
+weights: {A: 1, B: 1}
+br0: 100000
+fill: close
+interval: 1 day
+expected:
+  label_tz: null
+  values:
+    - ["2026-03-02", 100000]
+    - ["2026-03-03", 101000]
+    - ["2026-03-04", 104000]
+    - ["2026-03-05", 104000]
+  fill_prices: {A: 100, B: 50}
+  shares: {A: 500, B: 1000}

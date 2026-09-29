@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pytest
 
 from portfolio_forecast.performance import statistical_report
@@ -131,7 +132,10 @@ class TestCompile:
         spec["Title"] = "Returns & Risk: 95% of $100_000 {#1} ~^\\"
         spec["Introduction"] = ""
         spec["Reports"]["Report 1"]["Figures"]["Fig1"]["Caption"] = ""
-        spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "5 mins")}
+        # Five-minute paths over two sessions; intraday paths need their dates
+        dates = pd.date_range("2025-03-03 09:30", periods=11, freq="5min", tz="America/New_York").append(
+            pd.date_range("2025-03-04 09:30", periods=10, freq="5min", tz="America/New_York"))
+        spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "5 mins", dates=dates)}
         pdf = compile_statistical_reports(spec, output_dir=tmp_path)
         assert pdf.read_bytes().startswith(b"%PDF")
 

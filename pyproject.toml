@@ -27,7 +27,7 @@ Changelog = "https://github.com/YohoCodes/portfolio-forecast/blob/main/CHANGELOG
 [project.optional-dependencies]
 # The demo notebooks, which download prices from Yahoo Finance
 notebook = ["ipykernel", "yfinance"]
-test = ["pytest"]
+test = ["pytest", "pyyaml"]
 lint = ["ruff"]
 
 [tool.setuptools.packages.find]

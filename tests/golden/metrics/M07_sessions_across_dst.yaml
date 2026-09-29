@@ -1,0 +1,44 @@
+# Golden M07: across the US clock change, Dubai-time labels still group into
+# New York sessions, and the weekend's daily return runs Fri close -> Mon close.
+#
+# Rule: as M06. A value belongs to the session whose date it falls on, on
+#   New York's clock. Naive labels are read in `tz`.
+#
+# Setup: M04's values on Fri 03-06, Mon 03-09 and Tue 03-10, labelled in
+#   naive Dubai time (UTC+4, no daylight saving). New York moves from UTC-5
+#   to UTC-4 on Sun 03-08, so Dubai goes from 9 hours ahead to 8:
+#     Fri 10:30 / 13:30 / 16:00 NY -> 19:30 / 22:30 / 01:00 Sat, Dubai
+#     Mon and Tue                  -> 18:30 / 21:30 / 00:00 next day, Dubai
+#   rf = 0.
+#
+# Derivation: in New York time these are M04's values, so the session
+#   returns are M04's: Fri +0.01; Mon -0.01 (Fri's 16:00 close to Mon's,
+#   the weekend included); Tue +0.03. The figures are M04's.
+#
+# Grouped by Dubai calendar date instead, the closes fall on Sat 03-07,
+#   Tue 03-10 and Wed 03-11, giving five "days" (+3%, -1.94%, -2.97%,
+#   +6.12%, -0.97%) and a Sharpe of 2.70, not 7.94.
+# A fixed 9-hour offset would still group these values correctly: it only
+#   misplaces times within an hour of New York midnight, which regular-hours
+#   data doesn't have. So this case checks the grouping across the switch,
+#   not the offset itself; S09 checks the clock change on the labels.
+case: M07
+title: Across the US clock change, Dubai-time labels still group into New York sessions
+interval: 1h
+tz: Asia/Dubai
+risk_free_rate: 0.0
+values:
+  - ["2026-03-06 19:30", 100]
+  - ["2026-03-06 22:30", 103]
+  - ["2026-03-07 01:00", 101]
+  - ["2026-03-09 18:30", 96]
+  - ["2026-03-09 21:30", 98]
+  - ["2026-03-10 00:00", 99.99]
+  - ["2026-03-10 18:30", 101]
+  - ["2026-03-10 21:30", 104]
+  - ["2026-03-11 00:00", 102.9897]
+expected:
+  Daily Returns: [0.01, -0.01, 0.03]
+  Annualized Volatility: 0.317490157328
+  Sharpe Ratio: 7.93725393319
+  Sortino Ratio: 27.4954541697

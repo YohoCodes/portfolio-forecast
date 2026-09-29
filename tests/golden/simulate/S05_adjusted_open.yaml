@@ -1,0 +1,45 @@
+# Golden S05: with an adjusted close, the open is scaled onto the adjusted
+# basis, so day 1 earns the traded open -> close move.
+#
+# Rule: when both Close and Adj Close are present, the adjusted close is
+#   used, and each bar's open is multiplied by that bar's Adj Close / Close.
+#   Otherwise the first period would compare a raw open with an adjusted
+#   close.
+#
+# Setup: XYZ, daily bars, open fill. br0 = 100,000. A 2.00 dividend goes ex
+#   on Tue. Yahoo-style adjustment scales every close before the ex-date by
+#   1 - 2 / 100 = 0.98, so Mon's adjusted close is 98. Tue and Wed are
+#   unadjusted.
+#
+# Derivation: Mon's open on the adjusted basis = 99 x 98 / 100 = 97.02.
+#   q = 100,000 / 97.02 = 1,030.715316430 shares (adjusted).
+#   Mon 09:30  buy at 97.02                                  V = 100,000
+#   Mon 16:00  1,030.715316430 x 98                          V = 101,010.101010101
+#   Tue 16:00  1,030.715316430 x 99                          V = 102,040.816326531
+#   Wed 16:00  1,030.715316430 x 101                         V = 104,102.246959390
+#
+# Check: Mon's return 101,010.10 / 100,000 - 1 = 1.0101%, the same as the
+#   traded move 100 / 99 - 1. Mixing the raw open 99 with the adjusted close
+#   98 would give -1.0101% instead.
+case: S05
+title: The open is scaled onto the adjusted close's basis
+fields: [Open, Close, Adj Close]
+bars_tz: null
+bars:  # [date, open, close, adj close]
+  XYZ:
+    - ["2026-03-02", 99,   100, 98]
+    - ["2026-03-03", 98.5,  99, 99]
+    - ["2026-03-04", 99,   101, 101]
+weights: {XYZ: 1}
+br0: 100000
+fill: open
+interval: 1 day
+expected:
+  label_tz: America/New_York
+  values:
+    - ["2026-03-02 09:30", 100000]
+    - ["2026-03-02 16:00", 101010.101010101]
+    - ["2026-03-03 16:00", 102040.816326531]
+    - ["2026-03-04 16:00", 104102.246959390]
+  fill_prices: {XYZ: 97.02}
+  shares: {XYZ: 1030.715316430}

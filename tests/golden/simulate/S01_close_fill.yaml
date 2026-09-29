@@ -1,0 +1,67 @@
+# Golden S01: a close fill starts at the first close and keeps the first
+# period's return.
+#
+# Rule: with fill="close", the book is bought at the first bar's close, where
+#   it is worth br0, and labelled with that bar's date. The move to the second
+#   close is the first period. Opens are not used.
+#
+# Setup: SPY, daily bars. br0 = 100,000. Opens differ from closes on purpose.
+#
+# Derivation: q = 100,000 / 200 = 500 shares.
+#   Mon  buy 500 at C 200                               V = 100,000
+#   Tue  500 x 210                                      V = 105,000
+#   Wed  500 x 189                                      V =  94,500
+#   Thu  500 x 207.9                                    V = 103,950
+#
+# Report (daily, 252 bars a year, rf = 0):
+#   returns +5%, -10%, +10%; 3 periods; Total Days Mon -> Thu = 3.
+#   Total Return 103,950 / 100,000 - 1 = 0.0395; years = 3 / 252.
+#   CAGR = 1.0395 ^ (252 / 3) - 1 = 1.0395 ^ 84 - 1 = 24.8974777175.
+#   mean = 0.05 / 3 = 0.0166667; deviations 0.0333, -0.1167, 0.0833;
+#     squares sum 0.0216667; / 2 = 0.0108333; std = 0.104083299973.
+#   Annualized Volatility = std x sqrt(252) = 1.65227116419.
+#   Downside: only -0.1 falls below 0: sqrt(0.01 / 3) = 0.0577350269;
+#     x sqrt(252) = 0.916515138991.
+#   Sharpe = 0.0166667 / 0.104083299973 x sqrt(252) = 2.54195563721.
+#   Sortino = 0.0166667 / 0.0577350269 x sqrt(252) = 4.58257569496.
+#   Max drawdown: peak 105,000 -> 94,500 = -10%.
+#   2026 is a partial year (starts in March): days Mon -> Thu inclusive = 4.
+case: S01
+title: A close fill starts at the first close and keeps the first period
+fields: [Open, Close]
+bars_tz: null
+bars:  # [date, open, close]
+  SPY:
+    - ["2026-03-02", 190, 200]
+    - ["2026-03-03", 205, 210]
+    - ["2026-03-04", 195, 189]
+    - ["2026-03-05", 200, 207.9]
+weights: {SPY: 1}
+br0: 100000
+fill: close
+interval: 1 day
+expected:
+  label_tz: null
+  values:
+    - ["2026-03-02", 100000]
+    - ["2026-03-03", 105000]
+    - ["2026-03-04",  94500]
+    - ["2026-03-05", 103950]
+  fill_prices: {SPY: 200}
+  shares: {SPY: 500}
+  report:
+    Period Returns: [0.05, -0.1, 0.1]
+    Periods: 3
+    Total Days: 3
+    Total Years: 0.0119047619048
+    Initial Bankroll: 100000
+    Final Bankroll: 103950
+    Total Return: 0.0395
+    CAGR: 24.8974777175
+    Period Volatility: 0.104083299973
+    Annualized Volatility: 1.65227116419
+    Downside Volatility: 0.916515138991
+    Max Drawdown: -0.1
+    Sharpe Ratio: 2.54195563721
+    Sortino Ratio: 4.58257569496
+    Yearly Returns: [[2026, 0.0395, 4, false]]

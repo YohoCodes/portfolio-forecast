@@ -1,0 +1,45 @@
+# Golden S02: weights drift with prices; the book is never rebalanced.
+#
+# Rule: buy and hold. The share counts are fixed at the fill, so each
+#   symbol's weight moves with its price. Weights given as a dict are aligned
+#   by symbol and normalized: {A: 3, B: 2} is 60% / 40%.
+#
+# Setup: A and B, daily bars, close fill. br0 = 100,000.
+#
+# Derivation: q_A = 60,000 / 100 = 600; q_B = 40,000 / 50 = 800.
+#   Mon  buy at C: 600 x 100 + 800 x 50 =  60,000 + 40,000   V = 100,000
+#   Tue  600 x 110 + 800 x 45            =  66,000 + 36,000   V = 102,000
+#   Wed  600 x 120 + 800 x 40            =  72,000 + 32,000   V = 104,000
+#   Thu  600 x  90 + 800 x 55            =  54,000 + 44,000   V =  98,000
+#
+# By Wed, A is 72,000 / 104,000 = 69% of the book, not 60%. A book
+# rebalanced to 60/40 every day would end at 103,030.30 instead, so a
+# rebalancing bug can't pass this case.
+case: S02
+title: Weights drift with prices and the book is never rebalanced
+fields: [Close]
+bars_tz: null
+bars:  # [date, close]
+  A:
+    - ["2026-03-02", 100]
+    - ["2026-03-03", 110]
+    - ["2026-03-04", 120]
+    - ["2026-03-05", 90]
+  B:
+    - ["2026-03-02", 50]
+    - ["2026-03-03", 45]
+    - ["2026-03-04", 40]
+    - ["2026-03-05", 55]
+weights: {B: 2, A: 3}
+br0: 100000
+fill: close
+interval: 1 day
+expected:
+  label_tz: null
+  values:
+    - ["2026-03-02", 100000]
+    - ["2026-03-03", 102000]
+    - ["2026-03-04", 104000]
+    - ["2026-03-05",  98000]
+  fill_prices: {A: 100, B: 50}
+  shares: {A: 600, B: 800}
