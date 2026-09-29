@@ -526,19 +526,29 @@ backtest from [`simulate_buy_and_hold`](#simulate_buy_and_hold).
 [`performance_report`](#performance_report). `periods_per_year` is bars in a
 year at the series' interval, e.g. `PERIODS_PER_YEAR['1 day']` (252).
 
+#### `calculate_period_returns`
+
+```python
+calculate_period_returns(values)
+```
+
+One-period simple returns, `values[t] / values[t-1] - 1`, with the first
+(undefined) return dropped. The period is whatever bar `values` is sampled
+on: daily bars give daily returns, hourly bars hourly ones.
+
+**Parameters** — `values` (`Series`) portfolio values.
+
+**Returns** — `Series`, one shorter than `values`.
+
 #### `calculate_daily_return`
 
 ```python
 calculate_daily_return(values)
 ```
 
-One-period simple returns, `values[t] / values[t-1] - 1`, with the first
-(undefined) return dropped. Despite the name, the period is whatever bar
-`values` is sampled on.
-
-**Parameters** — `values` (`Series`) portfolio values.
-
-**Returns** — `Series`, one shorter than `values`.
+Deprecated alias for [`calculate_period_returns`](#calculate_period_returns);
+warns, and is removed in 1.0.0. The old name suggested daily returns, but the
+returns are per bar.
 
 #### `calculate_cagr`
 
@@ -565,7 +575,8 @@ calculate_sharpe_ratio(period_returns, periods_per_year, risk_free_rate=0.0)
 Annualized Sharpe ratio: `mean(r - rf / periods_per_year) / std(r) *
 sqrt(periods_per_year)`, with the sample standard deviation.
 
-**Parameters** — `period_returns` (`Series`) one-period returns;
+**Parameters** — `period_returns` (`Series`) one-period returns, e.g. from
+[`calculate_period_returns`](#calculate_period_returns);
 `periods_per_year` (`float`) bars per year; `risk_free_rate` (`float`,
 default `0.0`) annual rate, spread evenly across the year's bars.
 

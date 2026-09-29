@@ -1,15 +1,17 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 
 from ..utils.periods import _periods_per_year
 
 
-# Helper function for Daily Returns
-def calculate_daily_return(values):
+# Helper function for Period Returns
+def calculate_period_returns(values):
     """One-period simple returns of a value series.
 
-    Despite the name, the returns are per bar at whatever interval `values`
-    is sampled on (hourly bars give hourly returns).
+    The period is whatever bar `values` is sampled on: daily bars give daily
+    returns, hourly bars give hourly returns.
 
     Parameters
     ----------
@@ -24,8 +26,36 @@ def calculate_daily_return(values):
     """
     # Calculating percentage change in portfolio value, measuring a return across a
     # gap from the last known value (explicit, as pandas 3 no longer fills by default)
-    daily_returns = values.ffill().pct_change(fill_method=None).dropna()
-    return daily_returns
+    period_returns = values.ffill().pct_change(fill_method=None).dropna()
+    return period_returns
+
+
+def calculate_daily_return(values):
+    """Deprecated alias for `calculate_period_returns`.
+
+    .. deprecated:: 0.4.0
+        `calculate_daily_return` will be removed in 1.0.0; use
+        `calculate_period_returns` instead. The returns are per bar, not per
+        day, which the old name hid.
+
+    Parameters
+    ----------
+    values : pandas.Series
+        Portfolio values or prices, one per bar, oldest first.
+
+    Returns
+    -------
+    pandas.Series
+        The same result as ``calculate_period_returns(values)``.
+
+    Warns
+    -----
+    DeprecationWarning
+        Always.
+    """
+    warnings.warn("calculate_daily_return is deprecated and will be removed in 1.0.0; "
+                  "use calculate_period_returns instead", DeprecationWarning, stacklevel=2)
+    return calculate_period_returns(values)
 
 
 # Helper function for CAGR (compound annual growth rate)
@@ -78,7 +108,7 @@ def calculate_sharpe_ratio(period_returns, periods_per_year, risk_free_rate=0.0)
     Parameters
     ----------
     period_returns : pandas.Series
-        One-period simple returns, e.g. from `calculate_daily_return`.
+        One-period simple returns, e.g. from `calculate_period_returns`.
     periods_per_year : float
         Bars in one year at the returns' interval, used to annualize.
     risk_free_rate : float, default 0.0
@@ -111,7 +141,7 @@ def calculate_sortino_ratio(period_returns, periods_per_year, risk_free_rate=0.0
     Parameters
     ----------
     period_returns : pandas.Series
-        One-period simple returns, e.g. from `calculate_daily_return`.
+        One-period simple returns, e.g. from `calculate_period_returns`.
     periods_per_year : float
         Bars in one year at the returns' interval, used to annualize.
     risk_free_rate : float, default 0.0
@@ -309,7 +339,7 @@ def performance_report(
     periods_per_year = _periods_per_year(interval)
 
     # Calculating return series at the chosen interval
-    period_returns = calculate_daily_return(values)
+    period_returns = calculate_period_returns(values)
 
     # Calculating overall summary metrics. Time is counted in bars, the clock
     # every annualized figure here uses; calendar days are for display only.

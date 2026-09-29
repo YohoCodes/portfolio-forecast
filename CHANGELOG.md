@@ -6,6 +6,18 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `calculate_period_returns(values)` in `portfolio_forecast.performance`: the
+  one-period returns of a value series, per bar at the series' interval.
+
+### Deprecated
+
+- `calculate_daily_return` is renamed `calculate_period_returns`, since it
+  returns per-bar returns (hourly on hourly bars), not daily ones. The old
+  name still works but raises a `DeprecationWarning`, and is removed in
+  1.0.0. Results are unchanged; switch to the new name.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added

@@ -8,6 +8,7 @@ from portfolio_forecast.performance import (
     calculate_cagr,
     calculate_daily_return,
     calculate_max_drawdown,
+    calculate_period_returns,
     calculate_sharpe_ratio,
     calculate_sortino_ratio,
     performance_report,
@@ -16,9 +17,9 @@ from portfolio_forecast.performance import (
 
 
 class TestMetrics:
-    def test_daily_return(self):
+    def test_period_returns(self):
         values = pd.Series([100.0, 110.0, 99.0])
-        assert calculate_daily_return(values).tolist() == pytest.approx([0.10, -0.10])
+        assert calculate_period_returns(values).tolist() == pytest.approx([0.10, -0.10])
 
     def test_cagr_counts_bars(self):
         # 252 daily bars of +0.1% is exactly one year
@@ -53,6 +54,25 @@ class TestMetrics:
 
     def test_max_drawdown_of_rising_series_is_zero(self):
         assert calculate_max_drawdown(pd.Series([1.0, 2.0, 3.0])) == 0.0
+
+
+class TestDeprecatedDailyReturn:
+    """`calculate_daily_return` still works as an alias until 1.0.0, with a warning."""
+
+    def test_warns_and_matches_period_returns(self, prices):
+        values = prices["X"]
+        with pytest.warns(DeprecationWarning, match="removed in 1.0.0"):
+            got = calculate_daily_return(values)
+        pd.testing.assert_series_equal(got, calculate_period_returns(values))
+
+    def test_warning_points_at_the_caller(self, prices):
+        with pytest.warns(DeprecationWarning) as record:
+            calculate_daily_return(prices["X"])
+        assert record[0].filename == __file__
+
+    def test_performance_report_does_not_warn(self, prices, recwarn):
+        performance_report(prices["X"], prices.index, "1 day")
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
 
 class TestYearlyReturns:
@@ -103,7 +123,7 @@ class TestPerformanceReport:
     def test_matches_the_metric_helpers(self, prices):
         values = prices["X"]
         report = performance_report(values, values.index, "1D", risk_free_rate=0.02)
-        r = calculate_daily_return(values)
+        r = calculate_period_returns(values)
         assert report["Risk"]["Sharpe Ratio"] == pytest.approx(calculate_sharpe_ratio(r, 252, 0.02))
         assert report["Risk"]["Sortino Ratio"] == pytest.approx(calculate_sortino_ratio(r, 252, 0.02))
         assert report["Risk"]["Max Drawdown"] == pytest.approx(calculate_max_drawdown(values))
