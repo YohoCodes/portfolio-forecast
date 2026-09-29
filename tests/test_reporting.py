@@ -135,7 +135,8 @@ class TestCompile:
         # Five-minute paths over two sessions; intraday paths need their dates
         dates = pd.date_range("2025-03-03 09:30", periods=11, freq="5min", tz="America/New_York").append(
             pd.date_range("2025-03-04 09:30", periods=10, freq="5min", tz="America/New_York"))
-        spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "5 mins", dates=dates)}
+        with pytest.warns(UserWarning, match=r"Sortino Ratio \(11 paths\)"):
+            spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "5 mins", dates=dates)}
         pdf = compile_statistical_reports(spec, output_dir=tmp_path)
         assert pdf.read_bytes().startswith(b"%PDF")
 

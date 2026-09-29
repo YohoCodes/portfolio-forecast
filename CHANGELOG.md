@@ -13,6 +13,21 @@ uses [Semantic Versioning](https://semver.org/).
 - `performance_report` and `statistical_report` take `calendar` and `tz`, as
   `simulate_buy_and_hold` does, to find the trading sessions of intraday
   values. Both reports also return `"Daily Returns"`.
+- `simulate_buy_and_hold` warns when a held symbol's prices stop before the
+  last bar (a delisting, an acquisition or a data gap at the end), naming it
+  and the date of its last price. On intraday bars the times are the close
+  labels the values carry, not the bar starts. The symbol is still held at that price,
+  which is the same as selling it there and keeping the cash at 0%, so a
+  delisting loss is not booked. Values are unchanged.
+- The Monte Carlo simulators warn when `values` looks intraday (times of day
+  across several dates). They simulate each session's first return, which
+  holds the overnight gap, as an ordinary bar: this distorts the intraday
+  path shape and max drawdown, and can make the regime-switching model's
+  regimes follow the time of day. Use daily values for the regime-switching
+  model. Simulated paths are unchanged.
+- `statistical_report` warns how many paths end at a total loss, and which
+  summaries leave out paths where their metric is undefined (e.g. Sortino
+  on a path with no losing bar), with the number of paths.
 
 ### Changed
 
@@ -21,15 +36,41 @@ uses [Semantic Versioning](https://semver.org/).
   returns (session close to session close, annualized with 252) instead of
   per-bar returns. A bar return across the night holds the whole overnight
   gap but counted as one bar of trading, which skewed these figures. Daily
-  data gives the same
-  numbers as before, and total return, CAGR and drawdown are unchanged.
+  data gives the same numbers as before, and total return and drawdown are
+  unchanged. (For CAGR on intraday bars, see below.)
 - **Breaking:** `statistical_report` raises `ValueError` for intraday `sims`
   without `dates`, since it needs them to find the sessions. Pass one date
   per column, e.g. the last historical date followed by
   `next_trading_dates`.
+- On intraday bars, CAGR and Total Years in `performance_report` and
+  `statistical_report` count time in sessions (years = number of daily
+  returns / 252) instead of bars. Counting bars assumed a full regular-hours
+  session every day, so extended hours, half-days and missing bars misstated
+  the time. Hourly or 5-minute CAGR figures change; daily data is unchanged.
+- `calculate_actual_yearly_return` takes `calendar` (default `"XNYS"`) and
+  `tz`, which `performance_report` passes through. A year now counts as full
+  only if the series covers its first and last exchange sessions. Before, a
+  start up to January 5 or an end from December 25 counted as full, and
+  showed 365 or 366 days. Intraday values go into the year of their session
+  date on the exchange's clock, so a New York close labelled 01:00 on
+  January 1 in another timezone stays in the old year.
+- **Breaking:** `calculate_cagr` raises `ValueError` instead of
+  `ZeroDivisionError` for a series with fewer than two values. Catch
+  `ValueError` instead.
+- `statistical_report`'s Lower and Upper columns are described as the range
+  of outcomes across simulated paths, not a confidence interval. The printed
+  report and the PDF tables now read "95% range across paths". The range
+  shows where a metric lands if the fitted model is true. It leaves out
+  uncertainty in the fitted parameters and is not an interval for the true
+  Sharpe or CAGR. Keys and numbers are unchanged.
 - Documented a limitation: intraday prices from yfinance aren't
   dividend-adjusted, so an ex-date's price drop shows as a loss in that
   session's return in `performance_report`'s risk figures.
+- `parametric_monte_carlo` treats a simulated return below −100% as a total
+  loss: the path drops to 0 and stays there. Before, such a draw made the
+  path's value negative. Paths without such a draw are unchanged.
+  `statistical_report` counts these paths with a Total Return, Max Drawdown
+  and CAGR of −100%.
 
 ### Deprecated
 
@@ -37,6 +78,26 @@ uses [Semantic Versioning](https://semver.org/).
   returns per-bar returns (hourly on hourly bars), not daily ones. The old
   name still works but raises a `DeprecationWarning`, and is removed in
   1.0.0. Results are unchanged; switch to the new name.
+
+### Fixed
+
+- `next_trading_dates` no longer adds a bar at an off-grid open (e.g. 09:30
+  on hourly bars) to every future session when continuing a
+  `simulate_buy_and_hold(..., fill="open")` series. Its first value, at the
+  fill, was read as a bar. `statistical_report` with those dates compounded
+  one extra bar into each simulated session, so daily volatility and Sharpe
+  came out about 7% too high (√(8/7) on regular-hours hourly bars).
+- CAGR is −100% when a series ends at 0 and NaN when it ends below 0, in
+  `calculate_cagr`, `performance_report` and `statistical_report`. Before,
+  `calculate_cagr` gave −100% or NaN depending on the number of bars, and
+  `statistical_report` gave NaN, which left total losses out of its CAGR
+  summary.
+- After a total loss (a value of 0), the returns that follow are 0 / 0 and
+  are left out, so the risk figures use the returns up to and including the
+  −100% one. Before, `statistical_report` gave such a path NaN volatility,
+  Sharpe and Sortino and left it out of those summaries, and
+  `performance_report` on intraday bars counted the undefined returns in
+  its downside deviation. The two reports now agree.
 
 ## [0.3.0] - 2026-09-24
 

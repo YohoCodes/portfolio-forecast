@@ -27,3 +27,6 @@ LinkedIn/
 # Stress-free sandbox to test workflows
 sandbox.ipynb
 sandbox/
+
+# Agent Settings
+.claude/

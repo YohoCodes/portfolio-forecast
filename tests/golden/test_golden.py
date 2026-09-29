@@ -23,8 +23,8 @@ ALL_CASES = SIM_CASES + METRIC_CASES
 TOL_VALUE = 1e-6    # dollars and shares; expected values are exact or written to 9 decimals
 RTOL_METRIC = 1e-9  # metrics are written to 12 significant digits
 
-EXPECTED_SIM = {"S01", "S02", "S03", "S04", "S05", "S06", "S07a", "S07b", "S08", "S09"}
-EXPECTED_METRICS = {"M01", "M02", "M03", "M04", "M05", "M06", "M07"}
+EXPECTED_SIM = {"S01", "S02", "S03", "S04", "S05", "S06", "S07a", "S07b", "S08", "S09", "S10"}
+EXPECTED_METRICS = {"M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09", "M10", "M11", "M12"}
 
 # The metrics performance_report and statistical_report both give for one path
 SHARED_METRICS = ["Final Bankroll", "Total Return", "CAGR", "Period Volatility", "Annualized Volatility",
@@ -188,12 +188,14 @@ def test_report_case(path):
 def test_compounding_identity(path):
     """Compounding the period returns, and the daily returns the risk
     figures use, gives back the total move: no return is dropped or counted
-    twice."""
+    twice. The only returns left out are the undefined 0 / 0 ones after a
+    total loss (M11)."""
     case, values = _case_values(path)
     report = performance_report(values, values.index, case["interval"], **_report_kwargs(case))
     total = values.iloc[-1] / values.iloc[0]
     assert np.prod(1 + report["Period Returns"].to_numpy()) == pytest.approx(total, rel=1e-12)
-    assert len(report["Period Returns"]) == len(values) - 1
+    after_loss = int((values.to_numpy()[:-1] == 0).sum())
+    assert len(report["Period Returns"]) == len(values) - 1 - after_loss
     if report["Daily Returns"] is not None:
         assert np.prod(1 + report["Daily Returns"].to_numpy()) == pytest.approx(total, rel=1e-12)
 

@@ -128,9 +128,11 @@ class TestNoLookAhead:
         values, _ = simulate_buy_and_hold(two_assets, [0.5, 0.5])
         gapped = two_assets.copy()
         gapped.loc[DATES[4]:, "B"] = np.nan
-        again, _ = simulate_buy_and_hold(gapped, [0.5, 0.5])
+        # The gap runs to the end, so B is held at its last price with a warning, not dropped
+        with pytest.warns(UserWarning, match="held at their last price"):
+            again, _ = simulate_buy_and_hold(gapped, [0.5, 0.5])
         pd.testing.assert_series_equal(values.iloc[:4], again.iloc[:4])
-        assert not recwarn
+        assert not [w for w in recwarn if "Dropped" in str(w.message)]
 
     def test_symbol_with_no_prices_is_reported(self, two_assets):
         with pytest.warns(UserWarning, match=r"C \(5 of 5 returns missing, no prices\)"):
@@ -271,10 +273,12 @@ class TestOpenFill:
     def test_later_gap_does_not_drop_a_symbol(self, hourly, recwarn):
         gapped = hourly.copy()
         gapped.iloc[-3:, gapped.columns.get_loc(("Close", "B"))] = np.nan
-        values, _ = simulate_buy_and_hold(gapped, [1, 1], fill="open")
+        # The gap runs to the end, so B is held at its last price with a warning, not dropped
+        with pytest.warns(UserWarning, match="held at their last price"):
+            values, _ = simulate_buy_and_hold(gapped, [1, 1], fill="open")
         clean, _ = simulate_buy_and_hold(hourly, [1, 1], fill="open")
         pd.testing.assert_series_equal(values.iloc[:-3], clean.iloc[:-3])
-        assert not recwarn
+        assert not [w for w in recwarn if "Dropped" in str(w.message)]
 
     def test_values_only_use_prices_known_by_their_label(self, hourly):
         # An open is known at its bar's start, a close at its bar's close
@@ -314,3 +318,31 @@ class TestOpenFill:
     def test_bad_weights_raise(self, hourly, w, message):
         with pytest.raises(ValueError, match=message):
             simulate_buy_and_hold(hourly, w, fill="open")
+
+
+class TestPricesStopEarly:
+    """A held symbol whose prices stop before the last bar is held at its last price, with a warning."""
+
+    @pytest.mark.parametrize("fill", ["close", "open"])
+    def test_warns_naming_the_symbol_and_its_last_price(self, hourly, fill):
+        data = hourly.copy()
+        data.loc[data.index[-3:], ("Close", "B")] = np.nan
+        # B's last price is the bar starting 12:00, true at its close, 13:00; the
+        # last bar (15:00 start) closes at 16:00. Labels as in the values.
+        with pytest.warns(UserWarning, match=r"to the end \(2025-06-05 16:00\).*B \(last price 2025-06-05 13:00\)"):
+            values, _ = simulate_buy_and_hold(data, {"A": 1, "B": 1}, fill=fill, tz=NY)
+        # Held at the last price: B's value is frozen, so only A moves over the last three bars
+        full, _ = simulate_buy_and_hold(data[[("Open", "A"), ("Close", "A")]], [1], fill=fill, tz=NY)
+        np.testing.assert_allclose(np.diff(values.to_numpy()[-4:]), np.diff(full.to_numpy()[-4:]) / 2)
+
+    def test_no_warning_for_a_symbol_with_zero_weight(self, hourly, recwarn):
+        data = hourly.copy()
+        data.loc[data.index[-3:], ("Close", "B")] = np.nan
+        simulate_buy_and_hold(data, {"A": 1}, tz=NY)
+        assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+
+    def test_no_warning_for_a_gap_inside_the_history(self, hourly, recwarn):
+        data = hourly.copy()
+        data.loc[data.index[5:8], ("Close", "B")] = np.nan
+        simulate_buy_and_hold(data, {"A": 1, "B": 1}, tz=NY)
+        assert not [w for w in recwarn if issubclass(w.category, UserWarning)]

@@ -20,9 +20,11 @@ def _bars_per_year(bar_seconds):
     return TRADING_DAYS * math.ceil(SECONDS_PER_DAY / bar_seconds)
 
 
-# Bars per year for each supported bar size, used to annualize. Keys are the
-# canonical bar-size strings; other spellings of the same sizes ('1D', '5min',
-# '5m', a Timedelta) are matched by parsing them (see _periods_per_year).
+# Bars per year for each supported bar size. The reports annualize with it on
+# daily and longer bars; on intraday bars they annualize session returns with
+# 252 instead, and the entry only confirms the bar size is supported. Keys are
+# the canonical bar-size strings; other spellings of the same sizes ('1D',
+# '5min', '5m', a Timedelta) are matched by parsing them (see _periods_per_year).
 PERIODS_PER_YEAR = {
     '1 secs':   _bars_per_year(1),
     '5 secs':   _bars_per_year(5),

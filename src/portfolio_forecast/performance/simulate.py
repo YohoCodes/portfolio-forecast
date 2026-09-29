@@ -82,6 +82,35 @@ def _normalize_weights(w, columns):
     return w / w.sum()
 
 
+def _warn_prices_stop_early(closing, w, stacklevel, labels=None):
+    """Warn about each held symbol (positive weight) whose last price comes
+    before the last bar: the backtest holds it at that price to the end, as
+    if sold there and kept as cash at 0%, which books no delisting loss.
+
+    `labels` gives each bar's close label, one per row of `closing`, so the
+    warning names the times the values carry, not the bar starts."""
+    labels = closing.index if labels is None else pd.DatetimeIndex(labels)
+    end = labels[-1]
+    daily = (closing.index == closing.index.normalize()).all()
+
+    def when(t):
+        return f"{t:%Y-%m-%d}" if daily else f"{t:%Y-%m-%d %H:%M}"
+
+    stale = []
+    for symbol, weight in zip(closing.columns, w, strict=True):
+        last = closing[symbol].last_valid_index()
+        if weight > 0 and last is not None and last < closing.index[-1]:
+            stale.append(f"{symbol} (last price {when(labels[closing.index.get_loc(last)])})")
+    if stale:
+        warnings.warn(
+            f"{len(stale)} symbol(s) have no prices after an earlier date and are held at their last "
+            f"price to the end ({when(end)}): {'; '.join(stale)}. That is the same as selling at "
+            "that price and keeping the cash at 0%. For a bankruptcy or forced delisting this books "
+            "none of the delisting loss; check for a delisting, takeover or data gap.",
+            UserWarning, stacklevel=stacklevel,
+        )
+
+
 def get_closing_prices(data):
     """Select closing prices from a price frame, as a (date x symbol) frame.
 
@@ -182,6 +211,8 @@ def simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None
         If any symbol is dropped for missing prices, naming each one: with
         ``fill="close"``, how many returns it is missing and the date of its
         first price; with ``fill="open"``, that it has no first open.
+        Also if a held symbol's prices stop before the last bar, naming each
+        one and the date of its last price.
 
     Notes
     -----
@@ -192,6 +223,16 @@ def simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None
     or dict of weights is realigned after the drop; an array must match the
     symbols that remain. Whether a symbol is dropped never depends on prices
     after the purchase.
+
+    A symbol whose prices stop before the end (a delisting, an acquisition or
+    a data gap at the end) is held at its last price, with a warning. That is
+    the same as selling it at that price and keeping the cash at 0%. For a
+    cash takeover near the last price this is about right. For a bankruptcy
+    or forced delisting it is too optimistic, since the delisting loss is
+    never booked. The frozen stretch also adds zero returns, which understates
+    that holding's risk. Data sources such as yfinance often return nothing
+    for tickers that no longer trade, so a backtest on today's tickers also
+    carries survivorship bias, which no setting here corrects.
 
     yfinance and Interactive Brokers label bars with their start time. A bar's
     close is only known at its end, which is why intraday values move to
@@ -211,11 +252,10 @@ def simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None
     if fill == "open":
         return _buy_at_open(data, w, br0, calendar, tz)
 
-    # Select the closing price across all tickers
     closing = get_closing_prices(data)
-    # Calculating one-period returns. A return across a gap is measured from the
-    # last known price. pandas < 3 did this by default; pandas 3 leaves the gap
-    # NaN, so the fill is explicit to keep results the same on either version.
+    # One-period returns. A return across a gap is measured from the last known
+    # price. pandas < 3 did this by default; pandas 3 leaves the gap NaN, so the
+    # fill is explicit to keep results the same on either version.
     returns = closing.ffill().pct_change(fill_method=None).iloc[1:]
 
     # A symbol missing any return (e.g. listed partway through the history) is
@@ -238,12 +278,20 @@ def simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None
         )
     returns = returns.drop(columns=dropped.index).dropna(axis=0)
 
+    # Intraday values are true at their bar's close, not its start. The grid is
+    # learned from every bar, so the closes are found before any row drop.
+    index = closing.index
+    closes = None
+    if calendar is not None and not (index == index.normalize()).all():
+        closes = pd.Series(close_times(index, calendar, tz), index=index)
+
     w = _normalize_weights(w, returns.columns)
+    _warn_prices_stop_early(closing[returns.columns], w, stacklevel=3,
+                            labels=None if closes is None else closes.to_numpy())
 
-    # Cumulative returns
+    # Buy and hold: asset i is worth w_i * br0 * prod(1 + r_i); the weights
+    # drift with prices and are never rebalanced
     cum_returns = (returns + 1).cumprod()
-
-    # Use .dot() to sum across assets into a single portfolio series
     values = cum_returns.dot(w * br0)
 
     # The book is bought at the close before the first return, where it is
@@ -252,11 +300,7 @@ def simulate_buy_and_hold(data, w, br0=1, fill="close", calendar="XNYS", tz=None
     start = closing.index[closing.index.get_loc(returns.index[0]) - 1]
     values = pd.concat([pd.Series([float(br0)], index=[start]), values])
 
-    # Intraday values are true at their bar's close, not its start. The grid is
-    # learned from every bar, so the closes are found before any row drop.
-    index = closing.index
-    if calendar is not None and not (index == index.normalize()).all():
-        closes = pd.Series(close_times(index, calendar, tz), index=index)
+    if closes is not None:
         values.index = pd.DatetimeIndex(closes.loc[values.index])
 
     return values, values.index
@@ -303,6 +347,8 @@ def _buy_at_open(data, w, br0, calendar, tz):
     closing = closing.drop(columns=unquoted)
     opening = opening.drop(columns=unquoted)
     w = _normalize_weights(w, closing.columns)
+    daily = (index == index.normalize()).all()
+    _warn_prices_stop_early(closing, w, stacklevel=4, labels=None if daily else close_labels)
 
     # The prices the book passes through: the fill open, then every close.
     # A gap holds the last quote (the fill price before the first close).

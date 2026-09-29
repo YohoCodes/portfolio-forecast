@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-# Formats tick labels with thousands separators, and places/labels date ticks
 import pandas as pd
 
 # LineCollection draws many lines in one call (much faster than 1,000 ax.plot calls)
@@ -9,8 +7,8 @@ from matplotlib.collections import LineCollection
 from matplotlib.ticker import FuncFormatter, MaxNLocator, StrMethodFormatter
 
 
-# Labels the x-axis (one step per simulated period) with each period's date
 def _label_dates(ax, dates, n_points):
+    """Label the x-axis (one step per simulated period) with each period's date."""
     dates = pd.DatetimeIndex(pd.to_datetime(dates))
     if len(dates) != n_points:
         raise ValueError(f'dates has {len(dates)} entries; expected {n_points} '
@@ -30,8 +28,8 @@ def _label_dates(ax, dates, n_points):
     ax.set_xlabel('Date', fontsize=11)
 
 
-# Draws one fan of simulated paths onto an existing axes
 def _draw_paths(ax, sims, method, cmap, norm, ylim, dates=None):
+    """Draw one fan of simulated paths onto an existing axes."""
     # x-axis values: period 0 (starting value) through the last simulated period
     steps = np.arange(sims.shape[1])
 
@@ -47,18 +45,18 @@ def _draw_paths(ax, sims, method, cmap, norm, ylim, dates=None):
                            colors=colors, linewidths=0.6, alpha=0.35)
     ax.add_collection(paths)
 
-    # Reference line at the starting value (every path starts at 1, so values are growth multiples)
+    # Reference line at the starting value (1.0 from the package's simulators, so
+    # values are growth multiples)
     start = sims[0, 0]
     ax.axhline(start, color='#444444', linestyle='--', linewidth=1,
                label=f'Starting value ({start:,.2f})')
-    # Median portfolio value across all paths at each period
+    # Pointwise median across paths at each period, not any one simulated path
     ax.plot(steps, np.median(sims, axis=0), color='#d62728', linewidth=2, label='Median path')
 
     # LineCollection doesn't autoscale the axes, so set the limits manually
     ax.set_xlim(steps[0], steps[-1])
     ax.set_ylim(*ylim)
 
-    # Title and axis labels
     ax.set_title(f'{method}: {sims.shape[0]:,} Simulated Portfolio Paths',
                  fontsize=14, fontweight='bold', loc='left')
     ax.set_xlabel('Period', fontsize=11)
@@ -73,19 +71,17 @@ def _draw_paths(ax, sims, method, cmap, norm, ylim, dates=None):
     for side in ('top', 'right'):
         ax.spines[side].set_visible(False)
 
-    # Legend for the reference lines
     ax.legend(loc='upper left', frameon=False)
 
 
-# Colorbar explaining the path colors (uses the same colormap and normalization as the paths)
 def _add_colorbar(fig, ax, cmap, norm):
+    """Colorbar for the path colors, on the paths' colormap and normalization."""
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, ax=ax, pad=0.015)
     cbar.set_label('Terminal Value', fontsize=11)
     cbar.outline.set_visible(False)
 
 
-# Fan chart of simulated portfolio paths
 def plot_simulated_paths(sims, method='Monte Carlo', dates=None, figsize=(12, 6.5), dpi=120):
     """Fan chart of simulated portfolio paths.
 
@@ -135,7 +131,6 @@ def plot_simulated_paths(sims, method='Monte Carlo', dates=None, figsize=(12, 6.
     cmap = plt.get_cmap('viridis')
     norm = plt.Normalize(sims[:, -1].min(), sims[:, -1].max())
 
-    # Create the figure and axes
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
     # Small margin on y around the paths
@@ -146,7 +141,6 @@ def plot_simulated_paths(sims, method='Monte Carlo', dates=None, figsize=(12, 6.
     return fig, ax
 
 
-# Side-by-side fan charts for comparing simulation methods
 def plot_path_comparison(sims_by_method, dates=None, figsize=None, dpi=120):
     """Fan charts of several simulation methods, side by side.
 

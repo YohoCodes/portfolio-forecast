@@ -1,0 +1,25 @@
+# Golden M12: CAGR is NaN for a series that ends below zero.
+#
+# Rule (Isaac, 2026-09-29): a negative ratio V_T / V_0 has no real annual
+#   rate, and losing more than the stake is not the same outcome as a total
+#   loss, so CAGR is NaN rather than -1. The package's own simulators can't
+#   end below 0; user values (leverage, shorts) can.
+#
+# Setup: daily values 100, 50, -10.
+#
+# Derivation:
+#   Total Return = -10 / 100 - 1 = -1.1.
+#   CAGR: V_T / V_0 = -0.1 < 0 -> NaN.
+#   Max Drawdown = -10 / 100 - 1 = -1.1.
+case: M12
+title: CAGR is NaN for a series that ends below zero
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2025-06-02", 100]
+  - ["2025-06-03", 50]
+  - ["2025-06-04", -10]
+expected:
+  Total Return: -1.1
+  CAGR: .nan
+  Max Drawdown: -1.1

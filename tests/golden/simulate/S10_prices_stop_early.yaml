@@ -1,0 +1,47 @@
+# Golden S10: a symbol whose prices stop before the end is held at its last
+# price, and the backtest warns.
+#
+# Rule (Isaac, 2026-09-29): a gap at the end of a symbol's history is filled
+#   like any other gap, with its last price. That values the position as if
+#   it were sold at that price and kept as cash at 0%. Because this can hide
+#   a delisting loss, simulate_buy_and_hold warns, naming the symbol and the
+#   date of its last price.
+#
+# Setup: daily closes, A and B at 50/50, br0 = 1,000, fill = close. B's
+#   prices stop after Tue 03-03 (e.g. delisted).
+#
+# Derivation: qA = 500 / 100 = 5, qB = 500 / 50 = 10.
+#   03-02  buy at the close                     V = 1,000
+#   03-03  5 x 110 + 10 x 40                    V =   950
+#   03-04  5 x 120 + 10 x 40  (B held at 40)    V = 1,000
+#   03-05  5 x 130 + 10 x 40  (B held at 40)    V = 1,050
+#   B's 400 after 03-03 is the cash from selling 10 shares at 40.
+case: S10
+title: A symbol whose prices stop early is held at its last price, with a warning
+fields: [Close]
+bars_tz: null
+bars:  # [date, close]
+  A:
+    - ["2026-03-02", 100]
+    - ["2026-03-03", 110]
+    - ["2026-03-04", 120]
+    - ["2026-03-05", 130]
+  B:
+    - ["2026-03-02", 50]
+    - ["2026-03-03", 40]
+    - ["2026-03-04", null]
+    - ["2026-03-05", null]
+weights: {A: 0.5, B: 0.5}
+br0: 1000
+fill: close
+interval: 1 day
+expected:
+  label_tz: null
+  values:
+    - ["2026-03-02", 1000]
+    - ["2026-03-03", 950]
+    - ["2026-03-04", 1000]
+    - ["2026-03-05", 1050]
+  fill_prices: {A: 100, B: 50}
+  shares: {A: 5, B: 10}
+  warnings: ["B (last price 2026-03-03)"]

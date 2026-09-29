@@ -1,0 +1,45 @@
+# Golden M11: after a total loss, the risk figures use the returns up to and
+# including the -100% one; the returns after it are left out.
+#
+# Rule (Isaac, 2026-09-29): once the value is 0, each later return is
+#   0 / 0, which is undefined. The risk figures stop at the loss, so the
+#   -100% return counts and the path keeps finite volatility, Sharpe and
+#   Sortino. Both reports agree, and statistical_report keeps the path in
+#   its summaries.
+#
+# Setup: daily values 100, 110, 99, 0, 0, 0. rf = 0.
+#
+# Derivation:
+#   Returns: 110 / 100 - 1 = 0.1, 99 / 110 - 1 = -0.1, 0 / 99 - 1 = -1.
+#     0 / 0 twice after that: left out. n = 3.
+#   mean = (0.1 - 0.1 - 1) / 3 = -1/3.
+#   Deviations 13/30, 7/30, -20/30; squares sum 618/900;
+#     sample variance (n - 1 = 2) = 103/300; std = 0.585946527708.
+#   Annualized Volatility = 0.585946527708 x sqrt(252) = 9.30161276339.
+#   Downside: min(r, 0)^2 = 0, 0.01, 1 -> sum 1.01 / n = 101/300;
+#     deviation 0.580229839518; x sqrt(252) = 9.21086315174.
+#   Sharpe  = -1/3 / 0.585946527708 x 15.8745078664 = -9.03069200329.
+#   Sortino = -1/3 / 0.580229839518 x 15.8745078664 = -9.11966648687.
+#   Period Volatility = the sample std above, 0.585946527708.
+#   CAGR = -1 (M10). Total Return = -1. Max Drawdown = 0 / 110 - 1 = -1.
+case: M11
+title: After a total loss, the risk figures stop at the -100% return
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2025-06-02", 100]
+  - ["2025-06-03", 110]
+  - ["2025-06-04", 99]
+  - ["2025-06-05", 0]
+  - ["2025-06-06", 0]
+  - ["2025-06-09", 0]
+expected:
+  Period Returns: [0.1, -0.1, -1]
+  Total Return: -1
+  CAGR: -1
+  Max Drawdown: -1
+  Period Volatility: 0.585946527708
+  Annualized Volatility: 9.30161276339
+  Downside Volatility: 9.21086315174
+  Sharpe Ratio: -9.03069200329
+  Sortino Ratio: -9.11966648687

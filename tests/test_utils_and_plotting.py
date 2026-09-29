@@ -65,6 +65,30 @@ class TestNextTradingDates:
         assert out.tolist() == [pd.Timestamp("2025-03-10 09:30", tz="America/New_York"),
                                 pd.Timestamp("2025-03-10 09:35", tz="America/New_York")]
 
+    @staticmethod
+    def _hourly(days, first_label):
+        # One label per hourly bar on a :00 grid, per session: `first_label` and then 10:00 to 15:00
+        # for bar starts, or 10:00 to 16:00 for bar closes
+        times = [first_label] + [f"{h}:00" for h in range(10, 16)] if first_label else \
+            [f"{h}:00" for h in range(10, 17)]
+        return pd.DatetimeIndex([f"{d} {t}" for d in days for t in times], tz="America/New_York")
+
+    def test_hourly_bars_keep_the_off_grid_open_bar(self):
+        # Bars labelled by start (yfinance): 09:30, 10:00, ..., 15:00
+        history = self._hourly(["2025-06-02", "2025-06-03"], "09:30")
+        out = next_trading_dates(history, 8, interval="1h", tz="America/New_York")
+        assert out.strftime("%m-%d %H:%M").tolist() == (
+            ["06-04 09:30"] + [f"06-04 {h}:00" for h in range(10, 16)] + ["06-05 09:30"])
+
+    def test_fill_open_label_does_not_add_a_bar_at_the_open(self):
+        # simulate_buy_and_hold(fill="open") labels: the 09:30 fill, then each bar's close, 10:00 to
+        # 16:00. The fill is a value, not a bar, so each future session has 7 bars, not 8
+        history = self._hourly(["2025-06-02", "2025-06-03"], None).insert(0, pd.Timestamp(
+            "2025-06-02 09:30", tz="America/New_York"))
+        out = next_trading_dates(history, 9, interval="1h", tz="America/New_York")
+        assert out.strftime("%m-%d %H:%M").tolist() == (
+            [f"06-04 {h}:00" for h in range(10, 17)] + ["06-05 10:00", "06-05 11:00"])
+
     def test_keeps_the_input_timezone_form(self):
         naive = next_trading_dates(pd.bdate_range("2025-06-02", periods=5), 1)
         aware = next_trading_dates(pd.bdate_range("2025-06-02", periods=5, tz="UTC"), 1)

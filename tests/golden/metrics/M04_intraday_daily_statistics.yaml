@@ -8,8 +8,8 @@
 #
 # Setup: hourly values, three per session (10:30, 13:30 and the 16:00
 #   close), naive New York times, Mon 03-02 to Wed 03-04. rf = 0. The series
-#   is deliberately sparse (not every hourly bar), so it doesn't check CAGR,
-#   which counts bars; S04 checks that clock on a full bar grid.
+#   is deliberately sparse (not every hourly bar). Time is counted in
+#   sessions, so the missing bars don't change Total Years or CAGR.
 #
 # Derivation:
 #   Session returns:
@@ -28,6 +28,10 @@
 #   Total Return = 102.9897 / 100 - 1 = 0.029897.
 #   Max drawdown: peak 103 (Mon 13:30), trough 96 (Tue 10:30): 96 / 103 - 1
 #     = -0.0679611650485.
+#   Time (Isaac, 2026-09-29): on intraday bars, years = daily returns / 252
+#     = 3 / 252 = 0.0119047619048, not 8 bars / 1,764.
+#   CAGR = 1.029897 ^ (252 / 3) - 1 = 1.029897 ^ 84 - 1 = 10.8762305316.
+#     Counting bars it would be 1.029897 ^ 220.5 - 1, about 660.
 #
 # The old rule annualized the 8 hourly returns with sqrt(1,764) and gave
 #   an annualized volatility of 1.18, nearly four times this: the overnight
@@ -57,3 +61,5 @@ expected:
   Sharpe Ratio: 7.93725393319
   Sortino Ratio: 27.4954541697
   Max Drawdown: -0.0679611650485
+  Total Years: 0.0119047619048
+  CAGR: 10.8762305316

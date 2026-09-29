@@ -1,0 +1,26 @@
+# Golden M10: CAGR is -100% for a series that ends at zero.
+#
+# Rule (Isaac, 2026-09-29, replacing the NaN rule set earlier that day): both
+#   reports give CAGR = -1 when the last value is exactly 0. It is the limit
+#   of (V_T / V_0) ^ (1 / years) - 1 as V_T -> 0, for any horizon, and it
+#   keeps a total loss in statistical_report's CAGR summary instead of
+#   dropping it. A last value below 0 stays NaN (M12).
+#
+# Setup: daily values, every holding going to zero: 100, 50, 0.
+#
+# Derivation:
+#   Total Return = 0 / 100 - 1 = -1.
+#   CAGR: V_T / V_0 = 0 -> 0 ^ (252 / 2) - 1 = -1.
+#   Max Drawdown = 0 / 100 - 1 = -1.
+case: M10
+title: CAGR is -100% for a series that ends at zero
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2025-06-02", 100]
+  - ["2025-06-03", 50]
+  - ["2025-06-04", 0]
+expected:
+  Total Return: -1
+  CAGR: -1
+  Max Drawdown: -1

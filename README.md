@@ -5,7 +5,7 @@ strategy. Give it a price or portfolio-value history and it simulates
 thousands of possible future paths by three methods: resampling past returns,
 drawing from a fitted distribution, or switching between fitted market
 regimes. It then summarizes the spread of outcomes (returns, risk and tail
-risk, with confidence intervals), draws them as fan charts, and typesets the
+risk, with the range of outcomes across paths), draws them as fan charts, and typesets the
 results as a PDF report. It also includes a buy-and-hold backtest and a
 performance report for a single historical series.
 
@@ -339,6 +339,10 @@ skew carry over; every draw is independent, so volatility clustering does not.
 
 **Raises** — `ValueError` if `values` has more than one column; `TypeError` if neither or both of `values` and `prices` are given.
 
+**Warns** — `UserWarning` if `values` looks intraday (a `DatetimeIndex` with
+times of day across more than one date); see
+[Intraday history](#intraday-history-and-the-overnight-gap).
+
 **See also** — [`parametric_monte_carlo`](#parametric_monte_carlo),
 [`regime_switching_monte_carlo`](#regime_switching_monte_carlo).
 
@@ -376,8 +380,12 @@ With `return_fit=True`, a tuple `(sims, fit)`, where `fit` is a `dict`:
 
 **Notes** — With `distribution=None`, prints each candidate's AIC
 (`2k - 2 log L`) and the one selected. The fitted distribution is unbounded,
-so a draw below −100% can send a path to zero or below;
-[`statistical_report`](#statistical_report) leaves CAGR as NaN for such paths.
+so a draw can fall below −100%; it is floored at −100%, a total loss, and the
+path stays at 0 from there. [`statistical_report`](#statistical_report) gives
+such a path a CAGR of −100%.
+
+**Warns** — `UserWarning` if `values` looks intraday; see
+[Intraday history](#intraday-history-and-the-overnight-gap).
 
 **See also** — [`nonparametric_monte_carlo`](#nonparametric_monte_carlo),
 [`regime_switching_monte_carlo`](#regime_switching_monte_carlo).
@@ -433,9 +441,28 @@ no historical returns falls back to its normal. Prints the BIC per regime count
 (when selecting), then each regime's mean, volatility and expected duration
 `1 / (1 - p_kk)`, from lowest to highest volatility. The model numbers regimes
 arbitrarily; ordering them by volatility changes only how they are reported.
+Fit it on daily values: on intraday history the gap-sized first bar of each
+session can become its own regime, so the regimes follow the time of day
+rather than the market.
+
+**Warns** — `UserWarning` if `values` looks intraday; see
+[Intraday history](#intraday-history-and-the-overnight-gap).
 
 **See also** — [`nonparametric_monte_carlo`](#nonparametric_monte_carlo),
 [`parametric_monte_carlo`](#parametric_monte_carlo).
+
+#### Intraday history and the overnight gap
+
+On intraday history, each session's first return runs from the previous
+session's close and holds the overnight gap. All three simulators treat it as
+an ordinary bar, and warn when `values` looks intraday:
+
+- **Bootstrap and parametric.** Gap-sized returns are drawn at random bars.
+  Session variance is right on average, so volatility and Sharpe in
+  [`statistical_report`](#statistical_report) are about right, but the
+  intraday path shape and max drawdown are distorted.
+- **Regime switching.** The regimes can track the time of day instead of the
+  market state. Use daily values.
 
 ### Reporting
 
@@ -449,8 +476,9 @@ statistical_report(sims, interval, dates=None, risk_free_rate=0.0, confidence=0.
 ```
 
 Compute every [`performance_report`](#performance_report) metric on each
-simulated path, then summarize each by its mean, median and central
-`confidence` interval across paths, and add tail risk of the total return.
+simulated path, then summarize each by its mean, median and the central
+`confidence` range of its values across paths, and add tail risk of the total
+return.
 
 **Parameters**
 
@@ -459,8 +487,8 @@ simulated path, then summarize each by its mean, median and central
 | `sims` | array-like | — | A [`sims` array](#sims-array). |
 | `interval` | `str` or `Timedelta` | — | Bar size of one period; see [`interval`](#interval). |
 | `dates` | array-like of datetimes | `None` | One per column of `sims`; see [`dates`](#dates-for-simulated-paths). Used for the calendar span and, on intraday bars, to find the sessions for the daily returns; required for intraday `sims`. |
-| `risk_free_rate` | `float` | `0.0` | Annual risk-free rate for Sharpe, Sortino and downside deviation. |
-| `confidence` | `float` | `0.95` | Interval coverage in (0, 1); 0.95 spans the 2.5th–97.5th percentiles and puts VaR and CVaR at the 5% tail. |
+| `risk_free_rate` | `float` | `0.0` | Annual risk-free rate as a fraction (0.05 = 5%) for Sharpe, Sortino and downside deviation; `risk_free_rate / 252` per session on intraday and daily bars. |
+| `confidence` | `float` | `0.95` | Share of paths inside the Lower–Upper range, in (0, 1); 0.95 spans the 2.5th–97.5th percentiles and puts VaR and CVaR at the 5% tail. A range of outcomes, not a confidence interval (see Notes). |
 | `display` | `bool` | `False` | Also print a formatted report. |
 | `calendar` | `str` or `None` | `"XNYS"` | Exchange calendar whose sessions intraday `dates` are grouped into. |
 | `tz` | `str` or tzinfo | `None` | Timezone of naive intraday `dates`; defaults to this machine's. |
@@ -474,9 +502,9 @@ simulated path, then summarize each by its mean, median and central
 | `"Daily Returns"` | `ndarray` or `None` | The daily returns the risk figures use, one row per path: session to session on intraday bars, the period returns on daily bars, `None` for weekly and longer bars |
 | `"Paths"`, `"Periods"` | `int` | `n_sims`, `n_periods` |
 | `"Total Days"` | `int` or `None` | Calendar days spanned by `dates`; `None` without `dates` |
-| `"Total Years"` | `float` | `n_periods / periods_per_year` |
+| `"Total Years"` | `float` | The time CAGR uses: daily returns per path / 252 on intraday bars, else `n_periods / periods_per_year` |
 | `"Confidence"` | `float` | The `confidence` used |
-| `"Returns"` | `DataFrame` | Rows Final Bankroll, Total Return, CAGR; columns Mean, Median, Lower, Upper |
+| `"Returns"` | `DataFrame` | Rows Final Bankroll, Total Return, CAGR; columns Mean, Median, Lower, Upper (Lower and Upper are the `(1 - confidence) / 2` and `(1 + confidence) / 2` quantiles across paths) |
 | `"Risk"` | `DataFrame` | Rows Period Volatility, Annualized Volatility, Downside Volatility, Max Drawdown, Sharpe Ratio, Sortino Ratio; same columns |
 | `"Tail Risk"` | `dict` | `"Probability of Loss"` (share of paths with a negative total return), `"Value at Risk"` (total return at the `1 - confidence` quantile), `"Conditional VaR"` (mean total return at or below it) |
 
@@ -486,9 +514,25 @@ on intraday bars, `dates` is missing or a date falls outside the calendar's
 sessions.
 
 **Notes** — The risk figures follow the same daily-returns rule as
-[`performance_report`](#performance_report). A metric undefined on a path (CAGR for a path ending at or below
-zero; Sharpe or Sortino with no variance or no downside) is NaN there and left
-out of that metric's summary.
+[`performance_report`](#performance_report). A path ending at 0 has a CAGR of −100%,
+and its risk figures use the returns up to the loss; the 0 / 0 returns after it
+are NaN in `"Period Returns"` and `"Daily Returns"`. A metric undefined on a path
+(CAGR for a path ending below zero; Sharpe or Sortino with no variance or no
+downside) is NaN there and left out of that metric's summary. Time is counted as in `performance_report`:
+sessions on intraday bars, bars otherwise.
+
+**Warns** — `UserWarning` if any path ends at a total loss (how many), or if a
+summary leaves out paths where its metric is undefined (which metrics, how many
+paths).
+
+Lower and Upper are a range of outcomes, not a confidence interval: where a
+metric lands over this horizon across paths drawn from the fitted model, as
+if the model were true. They are not an interval for the true Sharpe or CAGR,
+and they leave out the uncertainty in the fitted parameters. More paths make
+the quantiles more precise but don't narrow the range. To test whether a real
+strategy's Sharpe is above zero or a benchmark, use its historical returns
+(e.g. the probabilistic Sharpe ratio, a HAC standard error or a block
+bootstrap), not simulated paths.
 
 **See also** — [`performance_report`](#performance_report),
 [`plot_simulated_paths`](#plot_simulated_paths).
@@ -509,7 +553,7 @@ backtest from [`simulate_buy_and_hold`](#simulate_buy_and_hold).
 | `values` | `Series` | — | Portfolio values, oldest first, e.g. from [`simulate_buy_and_hold`](#simulate_buy_and_hold). |
 | `dates` | `DatetimeIndex` or array-like | — | The date of each value; used for calendar-year returns, the displayed calendar span and, on intraday bars, to find each session. |
 | `interval` | `str` or `Timedelta` | — | Bar size of `values`; see [`interval`](#interval). |
-| `risk_free_rate` | `float` | `0.0` | Annual risk-free rate for Sharpe, Sortino and downside deviation. |
+| `risk_free_rate` | `float` | `0.0` | Annual risk-free rate as a fraction (0.05 = 5%) for Sharpe, Sortino and downside deviation; `risk_free_rate / 252` per session on intraday and daily bars. |
 | `display` | `bool` | `False` | Also print a formatted report. |
 | `calendar` | `str` or `None` | `"XNYS"` | Exchange calendar whose sessions intraday values are grouped into; `None` groups by each date's own day. |
 | `tz` | `str` or tzinfo | `None` | Timezone of naive intraday `dates`; defaults to this machine's, as in [`simulate_buy_and_hold`](#simulate_buy_and_hold). |
@@ -522,7 +566,7 @@ backtest from [`simulate_buy_and_hold`](#simulate_buy_and_hold).
 | `"Daily Returns"` | `Series` of the daily returns the risk figures use: on intraday bars, each session's last value over the previous session's; on daily bars, the period returns; `None` for weekly and longer bars |
 | `"Periods"` | Number of bars, `len(values) - 1` |
 | `"Total Days"` | Calendar days from first to last date |
-| `"Total Years"` | `Periods / periods_per_year`, the time CAGR uses |
+| `"Total Years"` | The time CAGR uses: on intraday bars, the number of daily returns / 252; otherwise `Periods / periods_per_year` |
 | `"Returns"` | `dict`: Initial Bankroll, Final Bankroll, Total Return, CAGR, Actual Yearly Returns (from [`calculate_actual_yearly_return`](#calculate_actual_yearly_return)) |
 | `"Risk"` | `dict`: Period Volatility (per bar, not annualized), Annualized Volatility, Downside Volatility (annualized), Max Drawdown, Sharpe Ratio, Sortino Ratio |
 
@@ -539,8 +583,14 @@ partial when the series starts after the open. A value's session is its date
 on the exchange's clock, so extended-hours values join their day and its last
 value is the post-market one. Intraday prices from yfinance aren't
 dividend-adjusted, so an ex-date's price drop shows as a loss in that
-session's return. Total return, CAGR and max drawdown use every value, and
-CAGR counts time in bars.
+session's return. After a total loss (a value of 0), the 0 / 0 returns that
+follow are left out, so the risk figures stop at the −100% return and CAGR is
+−100%. Total return and max drawdown use every value. CAGR runs
+from the first value to the last and counts time on the risk figures' clock:
+sessions (252 a year) on intraday bars, bars on daily and longer ones, so
+extended hours, half-days and missing bars don't change it. The yearly returns
+place intraday values in the year of their session date, and call a year full
+when the series covers its first and last `calendar` sessions.
 
 **See also** — [`statistical_report`](#statistical_report).
 
@@ -582,13 +632,16 @@ calculate_cagr(values, periods_per_year)
 
 Compound annual growth rate: `(values[-1] / values[0]) ** (1 / years) - 1`
 with `years = (len(values) - 1) / periods_per_year`, counting time in bars.
+[`performance_report`](#performance_report) passes one value per session and
+252 on intraday bars, so time there is counted in sessions.
 
 **Parameters** — `values` (`Series`) portfolio values; `periods_per_year`
 (`float`) bars per year.
 
-**Returns** — `float`.
+**Returns** — `float`; −100% if the last value is 0 (a total loss), NaN if it
+is below zero relative to the first, where no real annual rate exists.
 
-**Raises** — `ZeroDivisionError` if `values` has one entry.
+**Raises** — `ValueError` if `values` has fewer than two entries.
 
 #### `calculate_sharpe_ratio`
 
@@ -602,7 +655,8 @@ sqrt(periods_per_year)`, with the sample standard deviation.
 **Parameters** — `period_returns` (`Series`) one-period returns, e.g. from
 [`calculate_period_returns`](#calculate_period_returns);
 `periods_per_year` (`float`) bars per year; `risk_free_rate` (`float`,
-default `0.0`) annual rate, spread evenly across the year's bars.
+default `0.0`) annual rate as a fraction (0.05 = 5%), spread evenly across
+the year's bars.
 
 **Returns** — `float`; infinite or NaN if the returns have zero variance.
 
@@ -636,20 +690,34 @@ Largest peak-to-trough decline: `min(values / cummax(values) - 1)`.
 #### `calculate_actual_yearly_return`
 
 ```python
-calculate_actual_yearly_return(values, dates)
+calculate_actual_yearly_return(values, dates, calendar="XNYS", tz=None)
 ```
 
 Return earned in each calendar year. The first year is measured from its
 first value; later years from the previous year's last value, so the move
 across each year boundary is counted.
 
-**Parameters** — `values` (`Series`) portfolio values; `dates` (array-like)
-the date of each value.
+**Parameters**
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `values` | `Series` | — | Portfolio values, oldest first. |
+| `dates` | array-like of datetimes | — | The date of each value. |
+| `calendar` | `str` or `None` | `"XNYS"` | Exchange calendar. Intraday dates go into the year of their date on its clock, and its first and last sessions of a year decide whether the year is full. `None` uses each date's own date and the year's first and last weekdays. |
+| `tz` | `str` or tzinfo | `None` | Timezone of naive intraday `dates`; defaults to this machine's. Unused for dates at midnight (daily and longer bars). |
 
 **Returns** — `DataFrame` indexed by year, with columns `return`; `days`
 (365 or 366 for a full year, else the calendar days from its first to last
-bar, inclusive); and `is_full` (False for a first year starting after
-January 5 or a last year ending before December 25).
+bar, inclusive); and `is_full` (False for a first year starting after that
+year's first session, or a last year ending before its last session; years
+in between are full).
+
+**Raises** — `ValueError` if `calendar` is unknown or doesn't cover the years
+spanned.
+
+**Notes** — Full is decided by session date, not time of day: a series whose
+first value is the close of the year's first session counts as full, although
+that session's own move isn't in the return.
 
 ### Plotting
 
@@ -742,8 +810,8 @@ or `"Reports"` is missing or empty, a `"Results"` is not from
 the engine is not installed, or LaTeX fails (the end of its log is included);
 nothing is written in either case.
 
-**Notes** — Needs the booktabs, caption, fancyhdr, float, geometry, hyperref,
-lmodern and microtype LaTeX packages, all part of TeX Live, MacTeX and MiKTeX.
+**Notes** — Needs the booktabs, caption, fancyhdr, float, geometry, graphicx,
+hyperref, lmodern, microtype and xcolor LaTeX packages, all part of TeX Live, MacTeX and MiKTeX.
 Figures are embedded as vector PDF and are not modified or closed; a figure
 is scaled to its `"Width"` share of the text width, so a wide one (such as a
 three-panel [`plot_path_comparison`](#plot_path_comparison)) gets small labels,
@@ -884,7 +952,9 @@ Also if a bar falls outside the calendar's sessions.
 
 **Warns** — `UserWarning` naming each symbol dropped for missing prices: with
 `"close"`, how many returns it is missing and the date of its first price;
-with `"open"`, that it has no open on the first bar.
+with `"open"`, that it has no open on the first bar. Also a `UserWarning`
+naming each held symbol whose prices stop before the last bar, with the date
+of its last price.
 
 **Notes**
 
@@ -892,6 +962,16 @@ with `"open"`, that it has no open on the first bar.
   symbol with no price at the start (e.g. listed partway through) can't be
   bought, so it is dropped and the remaining weights are renormalized. Whether
   a symbol is dropped never depends on prices after the purchase.
+- A symbol whose prices stop before the end (a delisting, an acquisition or a
+  data gap at the end) is held at its last price, with a warning. That is the
+  same as selling it at that price and keeping the cash at 0%. For a cash
+  takeover near the last price this is about right. For a bankruptcy or
+  forced delisting it is too optimistic, since the delisting loss is never
+  booked, and the frozen stretch adds zero returns that understate the
+  holding's risk.
+- Survivorship bias: yfinance often returns no data for tickers that no longer
+  trade, so a backtest on today's tickers leaves out the ones that failed.
+  Nothing in the package corrects for this.
 - yfinance and Interactive Brokers label bars with their start time, but a
   bar's close is only known at its end, so intraday values move to
   [`close_times`](#close_times). A daily date names the whole session, so
@@ -929,7 +1009,10 @@ Private functions, listed for completeness.
 | Function | Module | Role |
 | --- | --- | --- |
 | `_resolve_values(values, prices, func_name)` | `forecast/monte_carlo.py` | Accept the deprecated `prices` keyword in place of `values`, with a warning |
-| `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and interval of one metric across paths, ignoring NaN |
+| `_warn_if_intraday(values, func_name, hmm)` | `forecast/monte_carlo.py` | Warn when the history looks intraday, since the overnight gap is simulated as an ordinary bar |
+| `_warn_prices_stop_early(closing, w, stacklevel)` | `performance/simulate.py` | Warn about each held symbol whose prices stop before the last bar |
+| `_interval_summary(values, confidence)` | `performance/report.py` | Mean, median and central `confidence` range of one metric across paths, ignoring NaN |
+| `_exchange_dates(dates, calendar, tz)`, `_year_bounds(first_year, last_year, calendar)` | `performance/report.py` | Each date's date on the exchange's clock (midnight dates kept as they are), and each year's first and last trading day |
 | `_session_marks(dates, calendar, tz)` | `performance/report.py` | Positions the daily returns run between: the first value, then each session's last |
 | `_find_field`, `_get_field` | `performance/simulate.py` | Find a price field among column labels (case-insensitive, in order of preference) and select it from any accepted layout |
 | `_get_opening_prices`, `_normalize_weights`, `_buy_at_open` | `performance/simulate.py` | Opens on the closes' price basis, weights aligned and normalized, and the `fill="open"` backtest |

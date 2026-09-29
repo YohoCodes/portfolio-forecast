@@ -1,0 +1,35 @@
+# Golden M09: values labelled in Dubai time go into the year of their New
+# York session.
+#
+# Rule: a value's year is the year of its session date on the exchange's
+#   clock (XNYS: New York), as for the daily returns (M06). Naive labels are
+#   read in `tz`.
+#
+# Setup: hourly values, sparse on purpose (two per session: the 10:30 bar
+#   close and the 16:00 close), labelled in naive Dubai time. New York is
+#   UTC-5 in winter and Dubai UTC+4, so Dubai is 9 hours ahead:
+#   NY Wed 2025-12-31 10:30 -> Dubai 12-31 19:30   V = 100
+#   NY Wed 2025-12-31 16:00 -> Dubai 2026-01-01 01:00   V = 102
+#   NY Fri 2026-01-02 10:30 -> Dubai 01-02 19:30   V = 99.96
+#   NY Fri 2026-01-02 16:00 -> Dubai 01-03 01:00   V = 104.958
+#
+# Derivation (New York dates):
+#   2025: 102 / 100 - 1 = 0.02. Starts after 2025's first session (01-02):
+#         partial; days 12-31 -> 12-31 = 1.
+#   2026: 104.958 / 102 - 1 = 0.029 (102 x 1.029 = 104.958). Ends before
+#         2026's last session (12-31): partial; days 01-02 -> 01-02 = 1.
+#
+# Grouped by Dubai calendar year instead, 2025 holds only the first value
+#   (return 0) and 2026 gets the 12-31 close: 104.958 / 100 - 1 = 0.04958.
+case: M09
+title: Values labelled in Dubai time go into the year of their New York session
+interval: 1h
+tz: Asia/Dubai
+risk_free_rate: 0.0
+values:
+  - ["2025-12-31 19:30", 100]
+  - ["2026-01-01 01:00", 102]
+  - ["2026-01-02 19:30", 99.96]
+  - ["2026-01-03 01:00", 104.958]
+expected:
+  Yearly Returns: [[2025, 0.02, 1, false], [2026, 0.029, 1, false]]

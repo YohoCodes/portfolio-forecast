@@ -72,7 +72,7 @@ def _slug(title):
 
 
 def _interval_table(summary, caption, level):
-    """A booktabs table of Mean, Median and the interval for each metric row
+    """A booktabs table of Mean, Median and the range across paths for each metric row
     of a statistical_report summary frame."""
     rows = "\n".join(
         f"{_escape(metric)} & {_number(row['Mean'], metric)} & {_number(row['Median'], metric)} & "
@@ -84,7 +84,7 @@ def _interval_table(summary, caption, level):
 \caption{{{caption}}}
 \begin{{tabular}}{{lrrrr}}
 \toprule
- & & & \multicolumn{{2}}{{c}}{{{level} interval}} \\
+ & & & \multicolumn{{2}}{{c}}{{{level} range across paths}} \\
 \cmidrule(lr){{4-5}}
 Metric & Mean & Median & Lower & Upper \\
 \midrule
@@ -102,7 +102,7 @@ def _results_section(results, name):
              ("Horizon", f"{results['Periods']:,} periods ({results['Total Years']:.2f} years)")]
     if results.get("Total Days") is not None:
         setup.append(("Calendar span", f"{results['Total Days']:,} days"))
-    setup.append(("Confidence level", level))
+    setup.append(("Range across paths", level))
     setup_rows = "\n".join(f"{label} & {value} \\\\" for label, value in setup)
 
     tail = results["Tail Risk"]
@@ -208,9 +208,9 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         ``"Description"``, ``"Figures"`` and ``"Caption"`` may be empty or
         left out. ``"Width"`` is the figure's width as a share of the text
         width, greater than 0 and at most 1 (the default, full width); the
-        figure is centered and keeps its aspect ratio. Text is typeset literally (LaTeX special characters such as
-        ``%``, ``&`` and ``_`` are escaped), and a blank line starts a new
-        paragraph. The figure keys (``"Fig1"``) only name the figures in
+        figure is centered and keeps its aspect ratio. Text is typeset
+        literally (LaTeX special characters such as ``%``, ``&`` and ``_``
+        are escaped), and a blank line starts a new paragraph. The figure keys (``"Fig1"``) only name the figures in
         error messages.
     output_dir : str or path-like, default 'Reporting'
         Directory for the PDF, created if missing. A relative path is
@@ -247,8 +247,8 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
     Notes
     -----
     Requires a LaTeX distribution with the booktabs, caption, fancyhdr,
-    float, geometry, hyperref, lmodern and microtype packages, all part of
-    TeX Live, MacTeX and MiKTeX. Figures are embedded as vector PDF, so they
+    float, geometry, graphicx, hyperref, lmodern, microtype and xcolor
+    packages, all part of TeX Live, MacTeX and MiKTeX. Figures are embedded as vector PDF, so they
     stay sharp at any zoom; the Figure objects are not modified or closed.
 
     Examples

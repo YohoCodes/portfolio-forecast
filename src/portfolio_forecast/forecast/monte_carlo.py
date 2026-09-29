@@ -20,6 +20,32 @@ def _resolve_values(values, prices, func_name):
     return prices
 
 
+def _warn_if_intraday(values, func_name, hmm=False):
+    """Warn when `values` looks intraday: a DatetimeIndex with times of day,
+    spanning more than one date. The simulators treat each session's first
+    return, which holds the overnight gap, as an ordinary bar."""
+    index = getattr(values, 'index', None)
+    if not isinstance(index, pd.DatetimeIndex) or len(index) == 0:
+        return
+    wall = index if index.tz is None else index.tz_localize(None)
+    days = wall.normalize()
+    if (wall == days).all() or days.nunique() < 2:
+        return
+    if hmm:
+        effect = ("the model may fit the gap-sized first bar of each session as its own regime, so the "
+                  "regimes and Current Probability follow the time of day rather than the market. "
+                  "Fit on daily values instead")
+    else:
+        effect = ("gap-sized returns are drawn at random bars. Session volatility and Sharpe are about "
+                  "right on average, but the intraday path shape and max drawdown are distorted. Use "
+                  "daily values if those matter")
+    warnings.warn(
+        f"{func_name}: values look intraday (times of day across {days.nunique()} dates). Each "
+        f"session's first return holds the overnight gap and is treated as an ordinary bar: {effect}.",
+        UserWarning, stacklevel=3,
+    )
+
+
 def nonparametric_monte_carlo(values=None, sim_length=100, n_sims=1000, random_state=None, *, prices=None):
     """Simulate future value paths by resampling historical returns.
 
@@ -64,6 +90,11 @@ def nonparametric_monte_carlo(values=None, sim_length=100, n_sims=1000, random_s
     -----
     DeprecationWarning
         If `prices` is given.
+    UserWarning
+        If `values` looks intraday (a DatetimeIndex with times of day across
+        more than one date). Each session's first return holds the overnight
+        gap but is drawn like any other bar, which distorts the intraday path
+        shape and max drawdown.
 
     See Also
     --------
@@ -80,25 +111,24 @@ def nonparametric_monte_carlo(values=None, sim_length=100, n_sims=1000, random_s
     (1000, 101)
     """
     values = _resolve_values(values, prices, 'nonparametric_monte_carlo')
+    _warn_if_intraday(values, 'nonparametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between values, measuring a return across a gap
-    # from the last known value (explicit, as pandas 3 no longer fills by default)
+    # One-period returns; a return across a gap is measured from the last known
+    # value (explicit, as pandas 3 no longer fills by default)
     returns = values.ffill().pct_change(fill_method=None).dropna()
 
-    # Creating a matrix to store the returns for each
+    # Paths as growth multiples of the last historical value; column 0 is 1.0
     sims = np.zeros((n_sims, sim_length + 1))
     sims[:,0] = 1
 
+    # Each path: sim_length iid draws with replacement from the historical
+    # returns, compounded. flatten() makes a single-column DataFrame's draws 1-D
     for i in range(n_sims):
-        # Sampling from the returns with replacement
         ret_sample = returns.sample(n=sim_length, replace=True, random_state=rng).reset_index(drop=True)
-        # Obtaining the single period accumulation factors
-        acc_factor = ret_sample.to_numpy().flatten() + 1  # ensure 1D array, just in case
-        # The cumulative returns over the simulation period
+        acc_factor = ret_sample.to_numpy().flatten() + 1
         value = np.cumprod(acc_factor)
-        # Adding the simulated values to the simulation matrix
-        sims[i, 1:] = value  # value should be shape (sim_length,)
+        sims[i, 1:] = value
 
     return sims
 
@@ -165,16 +195,24 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
     -----
     DeprecationWarning
         If `prices` is given.
+    UserWarning
+        If `values` looks intraday (a DatetimeIndex with times of day across
+        more than one date). Each session's first return holds the overnight
+        gap but is drawn like any other bar, which distorts the intraday path
+        shape and max drawdown.
 
     Notes
     -----
     With `distribution=None`, prints each candidate's AIC
     (``2k - 2 log L``, k fitted parameters) and the one selected.
 
-    The fitted distribution is unbounded, so a draw can fall below -100%
-    and send a path to zero or below; heavy-tailed fits make this more
-    likely on long horizons. `statistical_report` leaves CAGR undefined (NaN)
-    for such paths.
+    The fitted distribution is unbounded below, so a draw can fall below
+    -100%. Such a draw is floored at -100%, a total loss: the path drops to
+    0 and stays there, since a long-only book can lose no more than it
+    holds. The draws below -100% become a point mass at -100%, so the
+    simulated returns follow the fitted distribution everywhere else.
+    Heavy-tailed fits make a total loss more likely on long horizons.
+    `statistical_report` gives such a path a CAGR of -100%.
 
     See Also
     --------
@@ -192,10 +230,11 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
     ('johnsonsu', -13480.71...)
     """
     values = _resolve_values(values, prices, 'parametric_monte_carlo')
+    _warn_if_intraday(values, 'parametric_monte_carlo')
     rng = np.random.default_rng(random_state)
 
-    # Calculating the percent change between values, measuring a return across a gap
-    # from the last known value (explicit, as pandas 3 no longer fills by default)
+    # One-period returns; a return across a gap is measured from the last known
+    # value (explicit, as pandas 3 no longer fills by default)
     returns = values.ffill().pct_change(fill_method=None).dropna()
 
     data = returns.to_numpy().flatten()
@@ -213,7 +252,6 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
             aics[dist] = aic(dist, fits[dist])
             print(f'{dist.name:>10} AIC: {aics[dist]:,.2f}')
 
-        # Choosing the distribution with the lowest AIC
         distribution = min(aics, key=aics.get)
         params = fits[distribution]
         print(f'Selected: {distribution.name}')
@@ -223,18 +261,17 @@ def parametric_monte_carlo(values=None, distribution=None, sim_length=100, n_sim
         params = distribution.fit(data)
         candidate_aics = None
 
-    # Creating a matrix to store the returns for each
+    # Paths as growth multiples of the last historical value; column 0 is 1.0
     sims = np.zeros((n_sims, sim_length + 1))
     sims[:,0] = 1
 
+    # Each path: sim_length iid draws from the fitted distribution, compounded.
+    # The distribution is unbounded below; a draw under -1 is a total loss, so
+    # its growth factor is floored at 0 and the path stays at 0 from there
     for i in range(n_sims):
-        # Drawing returns from the fitted distribution
         ret_sample = distribution.rvs(*params, size=sim_length, random_state=rng)
-        # Obtaining the single period accumulation factors
-        acc_factor = ret_sample + 1
-        # The cumulative returns over the simulation period
+        acc_factor = np.maximum(ret_sample + 1, 0.0)
         value = np.cumprod(acc_factor)
-        # Adding the simulated values to the simulation matrix
         sims[i, 1:] = value
 
     if not return_fit:
@@ -336,6 +373,11 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
     -----
     DeprecationWarning
         If `prices` is given.
+    UserWarning
+        If `values` looks intraday (a DatetimeIndex with times of day across
+        more than one date). The gap-sized first bar of each session can be
+        fitted as its own regime, so the regimes track the time of day; fit
+        on daily values instead.
 
     Notes
     -----
@@ -371,6 +413,7 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
     >>> fit["Regimes"]["Volatility"]  # calm to turbulent
     """
     values = _resolve_values(values, prices, 'regime_switching_monte_carlo')
+    _warn_if_intraday(values, 'regime_switching_monte_carlo', hmm=True)
     rng = np.random.default_rng(random_state)
 
     # Calculating log returns as a column vector (hmmlearn expects shape (n_obs, n_features))
@@ -380,10 +423,12 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
         # Fitting K regimes from several random starts and keeping the highest log-likelihood
         best, best_ll = None, -np.inf
         for seed in rng.integers(2**31 - 1, size=n_starts):
-            # covars_prior=0: hmmlearn's default prior (1e-2) adds 0.01 to every variance
-            # estimate, far larger than a daily return's variance (~1e-4), which inflated
-            # regime volatilities and made the fit, and so the BIC, penalized rather than
-            # maximum likelihood. Degenerate fits the prior guards against are rejected below.
+            # covars_prior=0 keeps the fit, and so the BIC, maximum likelihood. hmmlearn's
+            # default 1e-2 enters the variance update as
+            #   var_k = (1e-2 + sum_t gamma_tk * (x_t - mu_k)**2) / N_k,
+            # N_k = expected bars in regime k: at N_k = 500 it adds 2e-5 to a daily
+            # variance of ~1e-4 (1% vol), about +10% on the regime's vol, and more for
+            # small regimes. Degenerate fits the prior would guard against are rejected below.
             model = GaussianHMM(n_components=K, covariance_type='full', n_iter=1000, tol=1e-6,
                                 covars_prior=0.0, random_state=int(seed))
             # Degenerate starts are common and are rejected below, so silence hmmlearn's warnings about them
@@ -419,7 +464,6 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
         return -2 * log_lik + n_params * np.log(len(X))
 
     if n_regimes is None:
-        # Scoring each regime count with BIC
         fits, bics = {}, {}
         for K in (1, 2, 3):
             try:
@@ -431,7 +475,6 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
             bics[K] = bic(K, fits[K][1])
             print(f'{K} regime(s) BIC: {bics[K]:,.2f}')
 
-        # Choosing the regime count with the lowest BIC
         n_regimes = min(bics, key=bics.get)
         model, log_lik = fits[n_regimes]
         print(f'Selected: {n_regimes} regime(s)')
@@ -452,7 +495,8 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
         print(f'Regime {rank}: mean {means[k]:+.4%}, vol {vols[k]:.4%}, '
               f'expected duration {durations[k]:.1f} periods')
 
-    # Starting each path in a regime drawn from today's regime probabilities
+    # Starting each path in a regime drawn from the regime probabilities at the
+    # last historical bar
     regime = rng.choice(n_regimes, size=n_sims, p=current)
 
     if bootstrap:
@@ -464,7 +508,9 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
     log_rets = np.empty((n_sims, sim_length))
     cum_P = np.cumsum(P, axis=1)
     for t in range(sim_length):
-        # Markov transition: drawing each path's next regime from its current regime's row
+        # Markov transition: each path's next regime by inverse CDF on its current
+        # regime's row of P; np.minimum catches a u above a row sum that rounds to
+        # just under 1
         u = rng.random(n_sims)
         regime = np.minimum((u[:, None] > cum_P[regime]).sum(axis=1), n_regimes - 1)
 
@@ -478,9 +524,8 @@ def regime_switching_monte_carlo(values=None, n_regimes=None, bootstrap=False, n
                 # Parametric draw (also the fallback if no historical return was assigned to regime k)
                 log_rets[idx, t] = rng.normal(means[k], vols[k], size=idx.size)
 
-    # Creating a matrix to store the value of each path
+    # Growth multiples from 1.0: log returns add, so exponentiate the running sum
     sims = np.ones((n_sims, sim_length + 1))
-    # The cumulative returns over the simulation period (log returns add, so exponentiate the running sum)
     sims[:, 1:] = np.exp(np.cumsum(log_rets, axis=1))
 
     if not return_fit:

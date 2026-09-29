@@ -23,8 +23,12 @@
 #   Tue 15:30  200 x 506                              V = 101,200
 #   Tue 16:00  200 x 512                              V = 102,400
 #
-# Report ("2 hours": 4 bars a session, 252 x 4 = 1,008 a year):
-#   8 periods, one per bar; years = 8 / 1,008 = 0.00793650793651.
+# Report ("2 hours"):
+#   8 periods, one per bar. Time is counted in sessions (Isaac, 2026-09-29):
+#     2 daily returns, years = 2 / 252 = 0.00793650793651. (With exactly 4
+#     bars a session this equals 8 bars / 1,008; M04 is the case where the
+#     two clocks differ.)
+#   CAGR = 1.024 ^ (252 / 2) - 1 = 1.024 ^ 126 - 1 = 18.8515552419.
 #   Tue's first return 99,400 / 101,600 - 1 = -0.0216535433071 holds the gap.
 #   Total Return 102,400 / 100,000 - 1 = 0.024.
 #   Returns, V[t] / V[t-1] - 1:
@@ -74,5 +78,6 @@ expected:
     Periods: 8
     Total Years: 0.00793650793651
     Total Return: 0.024
+    CAGR: 18.8515552419
     Daily Returns: [0.016, 0.00787401574803]
     Annualized Volatility: 0.0912139470036

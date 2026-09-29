@@ -27,13 +27,13 @@ class TestSimsContract:
     """Every simulator returns the documented sims array."""
 
     def test_shape_start_and_values(self, simulate, kwargs, prices):
-        sims = simulate(prices, sim_length=20, n_sims=30, random_state=1, **kwargs)
+        sims = simulate(prices, sim_length=20, n_sims=30, random_state=np.random.default_rng(1), **kwargs)
         assert sims.shape == (30, 21)
         assert np.all(sims[:, 0] == 1.0)
         assert np.isfinite(sims).all()
 
     def test_accepts_a_series(self, simulate, kwargs, prices):
-        sims = simulate(prices["X"], sim_length=5, n_sims=4, random_state=1, **kwargs)
+        sims = simulate(prices["X"], sim_length=5, n_sims=4, random_state=np.random.default_rng(1), **kwargs)
         assert sims.shape == (4, 6)
 
     def test_int_seed_gives_distinct_reproducible_paths(self, simulate, kwargs, prices):
@@ -54,18 +54,18 @@ class TestDeprecatedPrices:
     """`prices` still works as an alias for `values` until 1.0.0, with a warning."""
 
     def test_values_keyword_does_not_warn(self, simulate, kwargs, prices, recwarn):
-        simulate(values=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        simulate(values=prices, sim_length=5, n_sims=3, random_state=np.random.default_rng(1), **kwargs)
         assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
     def test_prices_warns_and_matches_values(self, simulate, kwargs, prices):
-        expected = simulate(prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+        expected = simulate(prices, sim_length=5, n_sims=3, random_state=np.random.default_rng(1), **kwargs)
         with pytest.warns(DeprecationWarning, match="removed in 1.0.0"):
-            got = simulate(prices=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+            got = simulate(prices=prices, sim_length=5, n_sims=3, random_state=np.random.default_rng(1), **kwargs)
         np.testing.assert_array_equal(got, expected)
 
     def test_warning_points_at_the_caller(self, simulate, kwargs, prices):
         with pytest.warns(DeprecationWarning) as record:
-            simulate(prices=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
+            simulate(prices=prices, sim_length=5, n_sims=3, random_state=np.random.default_rng(1), **kwargs)
         assert record[0].filename == __file__
 
     def test_both_raise(self, simulate, kwargs, prices):
@@ -79,7 +79,7 @@ class TestDeprecatedPrices:
 
 class TestNonparametric:
     def test_every_draw_is_a_historical_return(self, prices):
-        sims = nonparametric_monte_carlo(prices, sim_length=25, n_sims=20, random_state=0)
+        sims = nonparametric_monte_carlo(prices, sim_length=25, n_sims=20, random_state=np.random.default_rng(0))
         history = prices["X"].pct_change().dropna().to_numpy()
         drawn = (sims[:, 1:] / sims[:, :-1] - 1).ravel()
         assert np.isclose(drawn[:, None], history[None, :]).any(axis=1).all()
@@ -92,7 +92,7 @@ class TestNonparametric:
 
 class TestParametric:
     def test_selects_by_aic_and_reports_it(self, prices, capsys):
-        parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=0)
+        parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=np.random.default_rng(0))
         out = capsys.readouterr().out
         for name in ("norm", "t", "johnsonsu"):
             assert f"{name} AIC" in out
@@ -100,29 +100,51 @@ class TestParametric:
 
     def test_given_distribution_skips_selection(self, prices, capsys):
         parametric_monte_carlo(prices, distribution=stats.laplace, sim_length=5, n_sims=2,
-                               random_state=0)
+                               random_state=np.random.default_rng(0))
         assert "AIC" not in capsys.readouterr().out
 
     def test_mean_return_matches_fitted_normal(self, prices):
         # With a normal fit, simulated one-period returns center on the historical mean
         sims = parametric_monte_carlo(prices, distribution=stats.norm, sim_length=200,
-                                      n_sims=200, random_state=0)
+                                      n_sims=200, random_state=np.random.default_rng(0))
         drawn = sims[:, 1:] / sims[:, :-1] - 1
         history = prices["X"].pct_change().dropna()
         assert drawn.mean() == pytest.approx(history.mean(), abs=3 * history.std() / np.sqrt(drawn.size))
         assert drawn.std() == pytest.approx(history.std(), rel=0.05)
 
+    def test_draw_below_minus_100_percent_is_a_total_loss(self):
+        # Per-bar sigma ~0.4 puts P(r < -1) near 0.6% per draw, so 200 paths x 50
+        # bars hold dozens of such draws. Expected paths are rebuilt from the same
+        # draws with scipy: growth factor max(1 + r, 0), compounded from 1.0
+        r = np.random.default_rng(1).normal(0.0, 0.4, 500).clip(-0.9)
+        values = pd.Series(100 * np.cumprod(1 + r))
+        sims = parametric_monte_carlo(values, distribution=stats.norm, sim_length=50,
+                                      n_sims=200, random_state=np.random.default_rng(42))
+
+        params = stats.norm.fit(values.pct_change().dropna().to_numpy())
+        rng = np.random.default_rng(42)
+        draws = np.array([stats.norm.rvs(*params, size=50, random_state=rng) for _ in range(200)])
+        expected = np.cumprod(np.maximum(1 + draws, 0.0), axis=1)
+
+        ruined = (draws < -1).any(axis=1)
+        assert ruined.any() and not ruined.all()
+        np.testing.assert_allclose(sims[:, 1:], expected, rtol=1e-12)
+        assert (sims >= 0).all()
+        # A ruined path is 0 from its first draw below -1 to the end
+        for i in np.flatnonzero(ruined):
+            assert (sims[i, 1 + np.argmax(draws[i] < -1):] == 0).all()
+
 
 class TestRegimeSwitching:
     def test_bootstrap_draws_are_historical_log_returns(self, two_regime_prices):
         sims = regime_switching_monte_carlo(two_regime_prices, n_regimes=2, bootstrap=True,
-                                            n_starts=3, sim_length=15, n_sims=20, random_state=0)
+                                            n_starts=3, sim_length=15, n_sims=20, random_state=np.random.default_rng(0))
         history = np.log(two_regime_prices).diff().dropna().to_numpy()
         drawn = np.diff(np.log(sims), axis=1).ravel()
         assert np.isclose(drawn[:, None], history[None, :]).any(axis=1).all()
 
     def test_selects_regime_count_by_bic(self, prices, capsys):
-        regime_switching_monte_carlo(prices, n_starts=2, sim_length=5, n_sims=2, random_state=0)
+        regime_switching_monte_carlo(prices, n_starts=2, sim_length=5, n_sims=2, random_state=np.random.default_rng(0))
         out = capsys.readouterr().out
         assert "BIC" in out and "Selected:" in out
 
@@ -130,21 +152,24 @@ class TestRegimeSwitching:
         # 50 regimes cannot each hold 1% of 400 returns
         with pytest.raises(ValueError, match="Could not fit 50 regimes"):
             regime_switching_monte_carlo(prices, n_regimes=50, n_starts=1, sim_length=5, n_sims=2,
-                                         random_state=0)
+                                         random_state=np.random.default_rng(0))
 
 
 class TestParametricFit:
     def test_returns_only_sims_by_default(self, prices):
-        out = parametric_monte_carlo(prices, distribution=stats.norm, sim_length=5, n_sims=3, random_state=0)
+        out = parametric_monte_carlo(prices, distribution=stats.norm, sim_length=5, n_sims=3,
+                                     random_state=np.random.default_rng(0))
         assert isinstance(out, np.ndarray)
 
     def test_fit_does_not_change_the_paths(self, prices):
-        plain = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=5)
-        sims, _ = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=5, return_fit=True)
+        plain = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=np.random.default_rng(5))
+        sims, _ = parametric_monte_carlo(prices, sim_length=10, n_sims=20,
+                                         random_state=np.random.default_rng(5), return_fit=True)
         np.testing.assert_allclose(sims, plain, rtol=1e-9)
 
     def test_selection_reports_the_lowest_aic(self, prices):
-        _, fit = parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=0, return_fit=True)
+        _, fit = parametric_monte_carlo(prices, sim_length=5, n_sims=2,
+                                        random_state=np.random.default_rng(0), return_fit=True)
         aics = fit["Candidates"]
         assert set(aics) == {"norm", "t", "johnsonsu"}
         assert list(aics.values()) == sorted(aics.values())
@@ -153,7 +178,7 @@ class TestParametricFit:
 
     def test_given_distribution_reports_its_fit(self, prices):
         _, fit = parametric_monte_carlo(prices, distribution=stats.t, sim_length=5, n_sims=2,
-                                        random_state=0, return_fit=True)
+                                        random_state=np.random.default_rng(0), return_fit=True)
         assert fit["Distribution"] == "t" and fit["Candidates"] is None
         assert list(fit["Parameters"]) == ["df", "loc", "scale"]
         data = prices["X"].pct_change().dropna().to_numpy()
@@ -163,7 +188,7 @@ class TestParametricFit:
     def test_parameters_are_named_for_each_distribution(self, prices):
         for dist, names in [(stats.norm, ["loc", "scale"]), (stats.johnsonsu, ["a", "b", "loc", "scale"])]:
             _, fit = parametric_monte_carlo(prices, distribution=dist, sim_length=2, n_sims=1,
-                                            random_state=0, return_fit=True)
+                                            random_state=np.random.default_rng(0), return_fit=True)
             assert list(fit["Parameters"]) == names
 
 
@@ -171,16 +196,16 @@ class TestRegimeFit:
     @pytest.fixture
     def fitted(self, two_regime_prices):
         return regime_switching_monte_carlo(two_regime_prices, n_starts=3, sim_length=10, n_sims=20,
-                                            random_state=0, return_fit=True)
+                                            random_state=np.random.default_rng(0), return_fit=True)
 
     def test_returns_only_sims_by_default(self, prices):
         out = regime_switching_monte_carlo(prices, n_regimes=1, n_starts=1, sim_length=5, n_sims=3,
-                                           random_state=0)
+                                           random_state=np.random.default_rng(0))
         assert isinstance(out, np.ndarray)
 
     def test_fit_does_not_change_the_paths(self, two_regime_prices, fitted):
         plain = regime_switching_monte_carlo(two_regime_prices, n_starts=3, sim_length=10, n_sims=20,
-                                             random_state=0)
+                                             random_state=np.random.default_rng(0))
         # The HMM fit can differ in the last bits with memory layout, so compare closely, not exactly
         np.testing.assert_allclose(fitted[0], plain, rtol=1e-9)
 
@@ -203,7 +228,7 @@ class TestRegimeFit:
 
     def test_given_regime_count_reports_only_its_bic(self, prices):
         _, fit = regime_switching_monte_carlo(prices, n_regimes=1, n_starts=1, sim_length=5, n_sims=2,
-                                              random_state=0, return_fit=True)
+                                              random_state=np.random.default_rng(0), return_fit=True)
         assert fit["Regime Count"] == 1 and list(fit["BIC"]) == [1]
         assert fit["Regimes"]["Current Probability"].iloc[0] == pytest.approx(1)
 
@@ -237,7 +262,7 @@ class TestAicSelection:
 
     def fit(self, returns, **kwargs):
         _, fit = parametric_monte_carlo(prices_from_returns(returns), sim_length=1, n_sims=1,
-                                        random_state=0, return_fit=True, **kwargs)
+                                        random_state=np.random.default_rng(0), return_fit=True, **kwargs)
         return fit
 
     def test_candidate_aics_match_an_independent_fit(self, prices):
@@ -271,7 +296,8 @@ class TestBicSelection:
 
     def fit(self, log_returns, **kwargs):
         _, fit = regime_switching_monte_carlo(prices_from_log_returns(log_returns), sim_length=1,
-                                              n_sims=1, random_state=0, return_fit=True, **kwargs)
+                                              n_sims=1, random_state=np.random.default_rng(0), return_fit=True,
+                                              **kwargs)
         return fit
 
     def test_one_regime_matches_the_closed_form_normal_fit(self):
@@ -305,3 +331,28 @@ class TestBicSelection:
         fit = self.fit(log_returns)
         assert fit["Regime Count"] == expected
         assert fit["Regime Count"] == min(fit["BIC"], key=fit["BIC"].get)
+
+
+@pytest.mark.parametrize("simulate, kwargs", SIMULATORS)
+class TestIntradayWarning:
+    """The simulators draw each session's gap-holding first return as an ordinary bar, so they warn
+    on intraday history."""
+
+    @staticmethod
+    def _hourly(n_days):
+        index = pd.DatetimeIndex([f"{d:%Y-%m-%d} {h}:30" for d in pd.bdate_range("2025-06-02", periods=n_days)
+                                  for h in range(9, 16)], tz="America/New_York")
+        rng = np.random.default_rng(0)
+        return pd.Series(100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(index)))), index=index)
+
+    def test_warns_on_intraday_history(self, simulate, kwargs):
+        with pytest.warns(UserWarning, match="look intraday"):
+            simulate(self._hourly(30), sim_length=5, n_sims=5, random_state=np.random.default_rng(1), **kwargs)
+
+    def test_no_warning_on_daily_or_unindexed_history(self, simulate, kwargs, prices, recwarn):
+        simulate(prices, sim_length=5, n_sims=5, random_state=np.random.default_rng(1), **kwargs)
+        simulate(pd.Series(self._hourly(30).to_numpy()), sim_length=5, n_sims=5,
+                 random_state=np.random.default_rng(1), **kwargs)
+        # One session of hourly bars: times of day, but no night between them
+        simulate(self._hourly(1), sim_length=5, n_sims=5, random_state=np.random.default_rng(1), **kwargs)
+        assert not [w for w in recwarn if issubclass(w.category, UserWarning)]

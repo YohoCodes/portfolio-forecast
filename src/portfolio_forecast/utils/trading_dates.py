@@ -1,4 +1,3 @@
-# Exchange calendar with NYSE holidays, special closures, and early closes
 import exchange_calendars as xcals
 import pandas as pd
 from dateutil.tz import tzlocal
@@ -82,7 +81,8 @@ def _next_intraday(dates, n_periods, step, cal):
     later = since_midnight[~first] if (~first).any() else since_midnight
     phase = (later % step).mode().min()
 
-    # Minutes before the open that bars start (0 for regular hours only)
+    # Offset of the earliest bar start from the open: negative with pre-market
+    # bars, else 0
     pre = min((df.loc[first, 't'] - df.loc[first, 'open']).min(), pd.Timedelta(0))
     # How far past the close the latest bar starts; bars must start before the close
     # unless the data shows extended-hours bars after it
@@ -90,10 +90,15 @@ def _next_intraday(dates, n_periods, step, cal):
     post_limit = past_close + pd.Timedelta(1) if past_close >= pd.Timedelta(0) else pd.Timedelta(0)
 
     # Does the data put a bar exactly at the session start when that start is off-grid?
+    # Majority vote over sessions, leaving out the first one when there are others: a
+    # fill="open" series starts with a value at the fill (e.g. 9:30) that isn't a bar.
+    # A tie counts as a bar at the start (data labelled by bar start can miss a first bar)
     starts = df.loc[first, 'open'] + pre
     off_grid = ((starts - starts.dt.normalize()) % step) != phase
-    first_off = df.loc[first, 't'][off_grid]
-    bar_at_start = bool((first_off == starts[off_grid]).any()) if off_grid.any() else True
+    if len(off_grid) > 1:
+        off_grid.iloc[0] = False
+    at_start = df.loc[first, 't'][off_grid] == starts[off_grid]
+    bar_at_start = bool(at_start.sum() * 2 >= len(at_start)) if off_grid.any() else True
 
     last = wall[-1]
     out = []

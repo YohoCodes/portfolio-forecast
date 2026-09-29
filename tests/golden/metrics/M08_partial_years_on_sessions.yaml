@@ -1,0 +1,37 @@
+# Golden M08: a year is partial unless the series covers its first and last
+# exchange sessions.
+#
+# Rule (Isaac, 2026-09-29): in the yearly returns, the first year is full
+#   only if the series starts on or before that year's first session, and
+#   the last year only if it ends on or after that year's last session
+#   (XNYS). Years in between are full: each is measured from the previous
+#   year's last value. A partial year's `days` is its calendar span, first
+#   to last value, inclusive; a full year's is 365 or 366.
+#
+# Setup: daily values, sparse on purpose (only the yearly table is checked,
+#   and it depends only on the first and last values of each year).
+#   XNYS: 2023's sessions run Tue 01-03 (01-02 is the observed New Year
+#   holiday) to Fri 12-29; 2024's run Tue 01-02 to Tue 12-31.
+#
+# Derivation:
+#   2023: starts Wed 01-04, a day after the first session: partial.
+#         return 110 / 100 - 1 = 0.1; days 01-04 -> 12-29 inclusive = 360.
+#   2024: ends Fri 12-27, before the last session (Tue 12-31): partial.
+#         return 121 / 110 - 1 = 0.1 (from 2023's last value);
+#         days 01-02 -> 12-27 inclusive (leap year) = 361.
+#
+# The old heuristic (partial only if the start is after Jan 5 or the end
+#   before Dec 25) called both years full, with 365 and 366 days.
+case: M08
+title: A year is partial unless the series covers its first and last sessions
+interval: 1 day
+risk_free_rate: 0.0
+values:
+  - ["2023-01-04", 100]
+  - ["2023-06-30", 104]
+  - ["2023-12-29", 110]
+  - ["2024-01-02", 99]
+  - ["2024-06-28", 104.5]
+  - ["2024-12-27", 121]
+expected:
+  Yearly Returns: [[2023, 0.1, 360, false], [2024, 0.1, 361, false]]
