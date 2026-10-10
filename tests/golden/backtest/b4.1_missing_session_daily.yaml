@@ -1,0 +1,35 @@
+# B4.1: a whole non-holiday session missing from daily data. The return
+# spanning it is irregular; the others stay regular.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-12-02 (Mon) to 2024-12-06 (Fri) are
+#    full sessions, 09:30-16:00; none is a holiday.
+# 2. Data: daily bars (midnight dates) 12-02, 12-03, 12-05, 12-06 for A, held;
+#    12-04 (Wed) is missing.
+# 3. Marks (B1 daily, B2, B3, fill="close"): the fill at 12-02's close, then
+#    each session's close: 12-02 16:00, 12-03 16:00, 12-05 16:00, 12-06 16:00.
+# 4. Freshness: A has its own close at every mark: fresh everywhere.
+# 5. Classes (daily returns are regular unless B4.1 says otherwise):
+#    - 12-03: close to close over consecutive sessions, regular
+#    - 12-05: from 12-03 16:00 to 12-05 16:00; the span contains the scheduled
+#      12-04 16:00 close, missing for the only held symbol, and 12-04 is not a
+#      holiday: irregular (B4.1)
+#    - 12-06: regular
+rule: [B4.1]
+kind: history_marks
+inputs:
+  bars: ["2024-12-02", "2024-12-03", "2024-12-05", "2024-12-06"]
+  opens:
+    A: [100.0, 101.0, 103.0, 104.0]
+  closes:
+    A: [101.0, 102.0, 104.0, 105.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-05T16:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true]
+  classes: [regular, irregular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

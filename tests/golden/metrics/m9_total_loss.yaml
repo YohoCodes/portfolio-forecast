@@ -1,0 +1,38 @@
+# M9: a total loss. CAGR is -100%, the 0/0 return after ruin is excluded from
+# the risk figures, which use the returns up to and including the -100% one,
+# and kept as a NaN row in the returns series.
+#
+# Derivation
+# 1. Daily values at XNYS closes (EST UTC-05:00), fill="close" layout:
+#    2024-12-02 16:00 100, 12-03 50, 12-04 0, 12-05 0.
+# 2. Returns: 50/100 - 1 = -0.5; 0/50 - 1 = -1.0; 0/0 undefined (M9).
+#    Risk series R = [-0.5, -1.0] (daily fill="close": the first is kept, M2),
+#    the 0/0 return excluded.
+#    Daily Returns keeps one row per return, 4 - 1 = 3, with the 0/0 return
+#    as NaN (M10): [-0.5, -1.0, NaN].
+# 3. Total Return = 0/100 - 1 = -1; CAGR = -1 (M9: V_T = 0); Max Drawdown = 1.
+# 4. sd = 0.5/sqrt(2) = 0.3535533906; Annualized Volatility = sqrt(0.125 x 252)
+#    = sqrt(31.5) = 5.6124860802. Sharpe = -0.75/0.3535533906 x sqrt(252)
+#    = -33.6749164810.
+# 5. DD = sqrt((0.25 + 1)/2) = sqrt(0.625) = 0.7905694150; Downside Volatility
+#    = sqrt(0.625 x 252) = sqrt(157.5) = 12.5499003980; Sortino
+#    = -0.75 sqrt(252)/0.7905694150 = -15.0598804776.
+rule: [M9, M1]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 50.0, 0.0, 0.0]
+expected:
+  report:
+    Total Return: -1.0
+    CAGR: -1.0
+    Max Drawdown: 1.0
+    Annualized Volatility: 5.612486080160912
+    Sharpe Ratio: -33.67491648096547
+    Downside Volatility: 12.549900398011134
+    Sortino Ratio: -15.05988047761336
+    Daily Returns:
+      values: [-0.5, -1.0, null]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

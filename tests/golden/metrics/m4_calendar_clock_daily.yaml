@@ -1,0 +1,23 @@
+# M4: cagr_clock="calendar" measures Y in calendar time from the first to the
+# last mark, Y = (t_T - t_0)/365.25 days; Total Years follows the same clock.
+#
+# Derivation
+# 1. Book D of m1_daily_fill_open_report.yaml: t_0 = 2024-12-02 09:30 EST,
+#    t_T = 2024-12-05 16:00 EST; V_0 = 100, V_T = 104.029596.
+# 2. t_T - t_0 = 3 days 6.5 hours = 3.2708333 days; Y = 3.2708333/365.25
+#    = 0.0089550536.
+# 3. CAGR = 1.04029596^(1/Y) - 1 = 1.04029596^111.6687898 - 1 = 81.3932415099.
+rule: [M4]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 103.02, 101.9898, 104.029596]
+  cagr_clock: calendar
+expected:
+  report:
+    Total Return: 0.04029596
+    CAGR: 81.39324150991015
+    Total Years: 0.008955053616244582
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

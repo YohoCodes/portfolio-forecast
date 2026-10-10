@@ -1,0 +1,39 @@
+# MC1: to_session_values with `now` exactly at the last session's close: a
+# session whose close is at or before now has ended, so it is kept at its
+# close (only a close after now leaves it out); its last mark is at the
+# close, so nothing is relabelled and there is no warning.
+#
+# Derivation
+# 1. Hourly marks (XNYS, EST UTC-05:00), fill="open", both sessions normal
+#    (close 16:00):
+#    - 2024-12-02: 09:30 100 (br0), 10:30 100.6, 11:30 101.1, 12:30 100.9,
+#      13:30 101.4, 14:30 101.8, 15:30 101.5, 16:00 102.0.
+#    - 2024-12-03: 09:30 102.3, 10:30 102.8, 11:30 102.5, 12:30 103.1,
+#      13:30 103.4, 14:30 103.0, 15:30 103.6, 16:00 103.9.
+#    Both sessions' last marks are at their 16:00 closes.
+# 2. now = 2024-12-03 16:00 EST, exactly the last session's close. The close
+#    is not after now (equal), so MC1 keeps the session: the boundary is
+#    "close <= now kept", as a backtest keeps a bar closing exactly at now.
+# 3. Output: 12-02 09:30 -> 100 (br0), 12-02 16:00 -> 102.0, 12-03 16:00
+#    -> 103.9. Values are copied, not computed.
+# 4. No warning: no session ends before its close, and the kept session is
+#    not in progress.
+rule: [MC1]
+kind: to_session_values
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00", "2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00",
+           "2024-12-03T15:30:00-05:00", "2024-12-03T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.6, 101.1, 100.9, 101.4, 101.8, 101.5, 102.0,
+           102.3, 102.8, 102.5, 103.1, 103.4, 103.0, 103.6, 103.9]
+  now: "2024-12-03T16:00:00-05:00"
+expected:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00"]
+  tz: America/New_York
+  values: [100.0, 102.0, 103.9]
+  warns: []
+tolerance: {abs: 1.0e-12}

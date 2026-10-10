@@ -1,0 +1,46 @@
+# B4.1: one held symbol has no bar mid-session; the other symbol's bar keeps the
+# mark, the first symbol is stale there, and both returns touching it are
+# irregular.
+#
+# Derivation
+# 1. Calendar: 2024-11-29, XNYS half-day 09:30-13:00 EST (UTC-05:00). Bars on a
+#    :30 hourly grid: 09:30, 10:30, 11:30, 12:30. Symbols A and B, both held.
+# 2. B has no 10:30 bar (open and close null); every other price is present.
+# 3. Marks (B1.1, B2, B3, fill="open"): 09:30 (fill), then each bar's close:
+#    10:30, 11:30 (A's 10:30 bar), 12:30, 13:00 (short last bar at the early
+#    close). 5 marks, 4 returns.
+# 4. Freshness:
+#    - A: all true.
+#    - B: 09:30 own open (true); 10:30 own close of the 09:30 bar (true); 11:30
+#      would be the close of its 10:30 bar, which is missing, so its 10:30
+#      price is carried forward (false); 12:30 and 13:00 own closes (true).
+#      A close mark is valued at closes (B1.3, V(C_{d,k})), so B's 11:30 bar
+#      open, stamped at the same instant, does not make B fresh at 11:30.
+# 5. Classes (B4.1):
+#    - 10:30: A, B fresh at 09:30 and 10:30: regular
+#    - 11:30: B stale at the end: irregular
+#    - 12:30: B stale at the start: irregular
+#    - 13:00: regular
+rule: [B4.1]
+kind: history_marks
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+         "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0]
+    B: [50.0, null, 51.0, 51.5]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0]
+    B: [50.5, null, 51.5, 52.0]
+  held: {A: true, B: true}
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true]
+    B: [true, true, false, true, true]
+  classes: [regular, irregular, irregular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

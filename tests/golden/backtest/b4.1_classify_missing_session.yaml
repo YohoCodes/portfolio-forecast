@@ -1,0 +1,26 @@
+# B4.1, MC1: classify_returns across a missing non-holiday session. The
+# return ending at the next open mark is irregular, not a gap.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-26 and 2024-11-27 full sessions
+#    09:30-16:00; 11-28 Thanksgiving; 2024-11-29 half-day 09:30-13:00.
+# 2. Labels: 11-26 15:30, 16:00; 11-29 09:30, 10:30, 11:30. Hourly grid on
+#    :30. No 11-27 mark, though 11-27 is a session.
+# 3. 5 marks, 4 returns:
+#    - 11-26 16:00: regular
+#    - 11-29 09:30: ends at an open mark at the session open (so open marks
+#      are inferable), but its span from 11-26 16:00 contains all of 11-27's
+#      scheduled marks, none in the series: irregular (B4.1), not gap
+#    - 11-29 10:30, 11:30: regular
+rule: [B4.1, MC1]
+kind: classify_returns
+inputs:
+  labels: ["2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00", "2024-11-29T09:30:00-05:00",
+           "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 103.0, 104.0]
+expected:
+  labels: ["2024-11-26T16:00:00-05:00", "2024-11-29T09:30:00-05:00",
+           "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00"]
+  classes: [regular, irregular, regular, regular]
+tolerance: 0  # labels and classes, compared exactly

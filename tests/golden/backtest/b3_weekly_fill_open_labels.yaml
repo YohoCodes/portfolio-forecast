@@ -1,0 +1,32 @@
+# B3, B2: weekly bars with fill="open". The fill is labelled at the open of the
+# first bar's first session, each value at the close of its bar's last session.
+#
+# Derivation
+# 1. Input: weekly bars (naive dates, each week's Monday) 2024-11-18,
+#    2024-11-25, 2024-12-02. One symbol, A, held.
+# 2. Session spans (XNYS, EST UTC-05:00), as in b3_weekly_bar_session_span:
+#    - week of 11-18: 11-18 09:30 to 11-22 16:00
+#    - week of 11-25: 11-25 09:30 to 11-29 13:00 (Thanksgiving closed, half-day)
+#    - week of 12-02: 12-02 09:30 to 12-06 16:00
+# 3. Marks: fill at the first bar's s_first open, 11-18 09:30; then each bar's
+#    s_last close: 11-22 16:00, 11-29 13:00, 12-06 16:00. 4 marks, 3 returns.
+# 4. A fresh everywhere.
+# 5. Classes: weekly is daily-or-longer, one class: all "regular" (U1).
+rule: [B3, B2]
+kind: history_marks
+inputs:
+  bars: ["2024-11-18", "2024-11-25", "2024-12-02"]
+  opens:
+    A: [100.0, 101.0, 102.0]
+  closes:
+    A: [101.0, 102.0, 103.0]
+  held: {A: true}
+  fill: open
+expected:
+  labels: ["2024-11-18T09:30:00-05:00", "2024-11-22T16:00:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true]
+  classes: [regular, regular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

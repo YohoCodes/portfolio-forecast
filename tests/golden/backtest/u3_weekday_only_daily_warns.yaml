@@ -1,0 +1,41 @@
+# U3: weekday-only daily data in continuous mode. Each weekend leaves
+# two grid points missing, so the Monday return is irregular; more than 10%
+# of returns are irregular, and one warning names calendar="24/5".
+#
+# Derivation
+# 1. calendar=None: grid t_k = t_0 + k Delta. Bars at 00:00 UTC on 2024-12-02
+#    (Mon) to 12-06 (Fri), then 12-09 (Mon), 12-10 (Tue): 7 bars. Steps between
+#    bars: 1 day five times, 3 days once, so Delta = 1 day (the modal step).
+# 2. Marks (B1.1: labelled at each bar's close, t + 1 day; fill="close": br0
+#    at the first bar's close): 12-03, 12-04, 12-05, 12-06, 12-07, 12-10, 12-11,
+#    all 00:00 UTC. The grid points 12-08 and 12-09 (the closes of the missing
+#    Saturday and Sunday bars) have no mark. 7 marks, 6 returns.
+# 3. Freshness: own close at every mark, fresh everywhere.
+# 4. Classes: regular, except the return ending 12-10, whose span 12-07 to
+#    12-10 contains the missing grid points 12-08 and 12-09: irregular.
+# 5. Warning (U3): 1 of 6 returns, 16.7%, is irregular, more than 10%: one
+#    UserWarning naming calendar="24/5" (the fix for weekday-only data).
+rule: [U3]
+kind: history_marks
+inputs:
+  calendar: null
+  bars: ["2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00", "2024-12-04T00:00:00+00:00",
+         "2024-12-05T00:00:00+00:00", "2024-12-06T00:00:00+00:00", "2024-12-09T00:00:00+00:00",
+         "2024-12-10T00:00:00+00:00"]
+  bars_tz: UTC
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-12-03T00:00:00+00:00", "2024-12-04T00:00:00+00:00", "2024-12-05T00:00:00+00:00",
+           "2024-12-06T00:00:00+00:00", "2024-12-07T00:00:00+00:00", "2024-12-10T00:00:00+00:00",
+           "2024-12-11T00:00:00+00:00"]
+  tz: UTC
+  fresh:
+    A: [true, true, true, true, true, true, true]
+  classes: [regular, regular, regular, regular, irregular, regular]
+  warns: ["24/5"]
+tolerance: 0  # labels, flags and classes, compared exactly

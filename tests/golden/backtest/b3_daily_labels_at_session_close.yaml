@@ -1,0 +1,22 @@
+# B3: daily bars are labelled at their session's close on the exchange clock,
+# including a half-day.
+#
+# Derivation
+# 1. Input: naive midnight dates 2024-11-25 (Mon), 11-26, 11-27, 11-29 (Fri),
+#    12-02 (Mon). 2024-11-28 is Thanksgiving (XNYS closed), so these are five
+#    consecutive sessions: daily bars.
+# 2. B3: "Daily: fill label, then each session's close"; daily is the
+#    one-session case of a bar's span, labelled at its close.
+# 3. XNYS closes, EST (UTC-05:00): 16:00 on 11-25, 11-26, 11-27 and 12-02;
+#    13:00 on the half-day 11-29.
+# 4. Labels are tz-aware on the exchange clock (B3: "daily output was dates" is
+#    the old behaviour).
+rule: [B3]
+kind: close_times
+inputs:
+  index: ["2024-11-25", "2024-11-26", "2024-11-27", "2024-11-29", "2024-12-02"]
+expected:
+  labels: ["2024-11-25T16:00:00-05:00", "2024-11-26T16:00:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-02T16:00:00-05:00"]
+  tz: America/New_York
+tolerance: 0  # labels only, compared exactly

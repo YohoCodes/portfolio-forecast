@@ -1,0 +1,16 @@
+# M12: fewer than two marks: statistical_report raises ValueError.
+#
+# Input: an array of two paths with one column each (only the starting value,
+# no simulated mark), interval "1 day".
+#
+# Derivation
+# 1. Each path has one mark (< 2): M12 raises ValueError, as
+#    performance_report does (m12_single_mark_raises).
+rule: [M12]
+kind: statistical_report
+inputs:
+  paths: [[1.0], [1.0]]
+  interval: "1 day"
+expected:
+  raises: ValueError
+tolerance: 0  # the call must raise

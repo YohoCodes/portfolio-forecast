@@ -1,0 +1,30 @@
+# M1, U3: continuous weekly bars (Delta = 7 days) use their own
+# bar returns, annualized with 365 d / Delta = 365/7.
+#
+# Derivation
+# 1. calendar=None. Marks 00:00 UTC on Mondays 2024-11-04, 11-11, 11-18,
+#    11-25: values 100, 102, 100.98, 102.9996. Delta = 7 days.
+# 2. Returns 0.02, -0.01, 0.02. Delta = 7 days >= 1 day, so all are kept
+#    under either fill (M2, U3: Delta >= 1 d keeps every bar return under
+#    both fills; same layout as m1_continuous_daily_input.yaml).
+# 3. sd = sqrt(0.0003); factor 365/7 = 52.1428571.
+#    Annualized Volatility = sqrt(0.0003 x 365/7) = 0.1250714082.
+#    Sharpe = 0.01/sqrt(0.0003) x sqrt(365/7) = sqrt(365/21) = 4.1690469392.
+#    DD = sqrt(0.01^2/3); Downside Volatility = DD sqrt(365/7) = 0.0416904694;
+#    Sortino = sqrt(3 x 365/7) = 12.5071408175.
+rule: [M1, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-11-04T00:00:00+00:00", "2024-11-11T00:00:00+00:00",
+           "2024-11-18T00:00:00+00:00", "2024-11-25T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 102.0, 100.98, 102.9996]
+  cagr_clock: calendar
+expected:
+  report:
+    Annualized Volatility: 0.1250714081749188
+    Sharpe Ratio: 4.16904693916396
+    Downside Volatility: 0.0416904693916396
+    Sortino Ratio: 12.50714081749188
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

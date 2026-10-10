@@ -1,0 +1,38 @@
+# MC1, B1.6: classify_returns classes a return ending at an open mark after the
+# session open (a missing first bar) as irregular. A gap earlier in the series
+# makes the open marks inferable.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00):
+#    - 2024-11-27 (09:30-16:00): 14:30, 15:30, 16:00
+#    - 2024-11-29 (half-day, 09:30-13:00): 09:30, 10:30, 11:30, 12:30, 13:00
+#    - 2024-12-02 (09:30-16:00): 10:30, 11:30, 12:30
+#    11 marks, 10 returns, indexed by the mark each ends at.
+# 2. 11-27 14:30 starts the series; no return ends there.
+# 3. 11-29's first mark is at its 09:30 session open, after 11-27's 16:00
+#    close: an open mark, so the series has open marks and each session's first
+#    mark is its open mark.
+# 4. 12-02's first mark, its open mark, is at 10:30, after the 09:30 session
+#    open: the session's first bar was missing (B1.6).
+# 5. Classes:
+#    - ending 11-27 15:30, 16:00: regular
+#    - ending 11-29 09:30: open mark at the session open: gap
+#    - ending 11-29 10:30, 11:30, 12:30, 13:00: regular
+#    - ending 12-02 10:30: open mark after the session open: irregular
+#    - ending 12-02 11:30, 12:30: regular
+rule: [MC1, B1.6]
+kind: classify_returns
+inputs:
+  labels: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [99.0, 99.5, 100.0, 100.5, 101.0, 102.0, 101.5, 103.0, 104.0, 105.0, 106.0]
+expected:
+  labels: ["2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  classes: [regular, regular, gap, regular, regular, regular, regular, irregular, regular, regular]
+tolerance: 0  # labels and classes, compared exactly

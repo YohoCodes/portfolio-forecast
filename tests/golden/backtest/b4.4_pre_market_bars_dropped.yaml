@@ -1,0 +1,45 @@
+# B4.4: pre-market bars on a session day are dropped before marks are
+# built, with one warning giving the count. The open mark is still the regular
+# session's first bar, so the pre-market moves fall into the gap.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-27 full session 09:30-16:00;
+#    11-28 Thanksgiving; 2024-11-29 half-day 09:30-13:00. Hourly bars on :30.
+# 2. Data, A held: 11-27 bars 14:30, 15:30 (short, to 16:00); 11-29 bars
+#    06:30, 07:30, 08:30 (pre-market: each ends at or before the 09:30 open, so
+#    lies outside [O_d, C_d]), then 09:30, 10:30, 11:30, 12:30 (short, to 13:00).
+# 3. B4.4: the three pre-market bars are dropped; one UserWarning with the
+#    count, 3.
+# 4. Marks on the remaining bars (fill="close"): 11-27 15:30 (fill), 16:00;
+#    11-29 09:30 (open mark at the 09:30 bar's start, the session open), 10:30,
+#    11:30, 12:30, 13:00. 7 marks.
+# 5. Freshness: own price at every mark (the open mark uses the 09:30 bar's
+#    own open): fresh everywhere.
+# 6. Classes: 11-27 16:00 regular; 11-29 09:30 gap (previous close to the open
+#    at the session open, a holiday between); 10:30, 11:30, 12:30, 13:00
+#    regular.
+rule: [B4.4, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00",
+         "2024-11-29T06:30:00-05:00", "2024-11-29T07:30:00-05:00", "2024-11-29T08:30:00-05:00",
+         "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00", "2024-11-29T09:30:00-05:00",
+           "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+           "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true, true, true]
+  classes: [regular, gap, regular, regular, regular, regular]
+  warns:
+    - {match: "outside|session|extended|dropp", count: 3}
+tolerance: 0  # labels, flags and classes, compared exactly

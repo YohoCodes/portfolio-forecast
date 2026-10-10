@@ -1,0 +1,60 @@
+# M4, MC8, MC3: end to end, a deterministic bootstrap run passed straight to
+# statistical_report with cagr_clock="calendar" and no dates. t_0 is the grid
+# point before the first future mark, the history's last mark, which the
+# SimulationResult's dates leave out (column 0 stands at it).
+#
+# History (XNYS, EST UTC-05:00; hourly grid on :30, Delta = 1 h),
+# fill="open": 2024-11-25, 11-26, 11-27, each 09:30 (open mark; the first is
+# the fill), closes 10:30 ... 15:30 and 16:00 (the 15:30-16:00 bar short,
+# rho = 1/2). Log returns: full bars m = 0.002, short bars m/2, the two gaps
+# g = -0.005. Values 100 exp(sum l), 17 significant digits. The history's
+# last mark is t_0 = 2024-11-27 16:00 EST.
+#
+# Derivation
+# 1. Bootstrap (MC3), as mc3_bootstrap_constant_hourly_half_day.yaml:
+#    gap pool {g} x 2, regular pool l' = m x 21 (m_hat = m), so every draw is
+#    forced: gaps g, full bars m, short bars m/2. min_sample = 2.
+# 2. Layout (MC2, MC8), sim_length = 2 sessions: 11-29 (half-day) 09:30 gap,
+#    10:30, 11:30, 12:30, 13:00 (short); 12-02 09:30 gap, 10:30 ... 15:30,
+#    16:00 (short). The last future mark is t_T = 2024-12-02 16:00 EST.
+# 3. V_T = exp(g + 3.5 m + g + 6.5 m) = exp(2 g + 10 m) = exp(0.01);
+#    Total Return = exp(0.01) - 1 = 0.0100501671 on every path.
+# 4. M4 calendar clock: Y = (t_T - t_0)/365.25 days = 5 days/365.25
+#    (11-27 16:00 to 12-02 16:00, both EST) = 0.0136892539 (Total Years).
+#    CAGR = V_T^(1/Y) - 1 = exp(0.01 x 73.05) - 1 = exp(0.7305) - 1
+#    = 1.0761184074.
+#    (Taking t_0 at the first future mark, 11-29 09:30, would give
+#    3.27 days; the session clock would give Y = 2/252.)
+# Tolerance: relative 1e-9.
+rule: [M4, MC8, MC3]
+kind: simulate_then_report
+inputs:
+  simulator: nonparametric_monte_carlo
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T10:30:00-05:00", "2024-11-25T11:30:00-05:00",
+           "2024-11-25T12:30:00-05:00", "2024-11-25T13:30:00-05:00", "2024-11-25T14:30:00-05:00",
+           "2024-11-25T15:30:00-05:00", "2024-11-25T16:00:00-05:00",
+           "2024-11-26T09:30:00-05:00", "2024-11-26T10:30:00-05:00", "2024-11-26T11:30:00-05:00",
+           "2024-11-26T12:30:00-05:00", "2024-11-26T13:30:00-05:00", "2024-11-26T14:30:00-05:00",
+           "2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T09:30:00-05:00", "2024-11-27T10:30:00-05:00", "2024-11-27T11:30:00-05:00",
+           "2024-11-27T12:30:00-05:00", "2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00",
+           "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.20020013340003, 100.40080106773419, 100.6018036054065, 100.80320855042736,
+           101.00501670841682, 101.2072288866078, 101.30848673598094,
+           100.80320855042736, 101.00501670841682, 101.2072288866078, 101.40984589384925,
+           101.6128685406095, 101.81629763897939, 102.0201340026756, 102.1222051637529,
+           101.61286854060951, 101.8162976389794, 102.02013400267562, 102.22437844704386,
+           102.4290317890622, 102.63409484734426, 102.83956844214255, 102.94245944751313]
+  sim_length: 2
+  n_sims: 3
+  random_state: 0
+  options: {min_sample: 2}
+  report_options: {cagr_clock: calendar}
+expected:
+  report:
+    Total Years: 0.013689253935660506
+  per_path:
+    Total Return: [0.010050167084167949, 0.010050167084167949, 0.010050167084167949]
+    CAGR: [1.0761184074062555, 1.0761184074062555, 1.0761184074062555]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

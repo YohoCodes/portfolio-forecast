@@ -1,0 +1,32 @@
+# U3, MC1, MC2, MC3: continuous daily bars (Delta = 1 day, daily by the
+# U3 analog of MC1). sim_length counts bars and the future marks are
+# t_T + k Delta, weekend days included.
+#
+# History (UTC, 24/7): 00:00 on 2024-12-01 (Sunday) to 12-06 (Friday), six
+#   marks, V = 100 x 1.01^k: 100, 101, 102.01, 103.0301, 104.060401,
+#   105.10100501.
+#
+# Derivation
+# 1. Every return is 0.01 (regular, tau = 1; U3). Pool {ln 1.01} x 5;
+#    min_sample = 5 is met.
+# 2. Layout: t_T + k x 1 day, k = 1, 2, 3: 12-07 (Saturday), 12-08 (Sunday),
+#    12-09 (Monday) at 00:00 UTC; regular.
+# 3. Path 1.01^k: 1.0, 1.01, 1.0201, 1.030301.
+# Tolerance: relative 1e-12.
+rule: [U3, MC1, MC2, MC3]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-12-01T00:00:00+00:00", "2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00",
+           "2024-12-04T00:00:00+00:00", "2024-12-05T00:00:00+00:00", "2024-12-06T00:00:00+00:00"]
+  values: [100.0, 101.0, 102.01, 103.0301, 104.060401, 105.10100501]
+  calendar: null
+  sim_length: 3
+  n_sims: 5
+  random_state: 6
+  options: {min_sample: 5}
+expected:
+  shape: [5, 4]
+  labels: ["2024-12-07T00:00:00+00:00", "2024-12-08T00:00:00+00:00", "2024-12-09T00:00:00+00:00"]
+  classes: [regular, regular, regular]
+  path: [1.0, 1.01, 1.0201, 1.030301]
+tolerance: {abs: 1.0e-12, rel: 1.0e-12}

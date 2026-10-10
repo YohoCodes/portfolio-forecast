@@ -1,0 +1,58 @@
+# B1.6: two sessions whose first bars are missing. Each open mark is labelled
+# at the first available bar's start and valued at its open; the returns
+# ending there are irregular; one warning counts the 2 sessions.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-27 09:30-16:00; 11-28
+#    Thanksgiving; 2024-11-29 half-day 09:30-13:00; 2024-12-02 09:30-16:00.
+#    Hourly bars on :30.
+# 2. Bars, AAA only (weight 1), br0 = 1000, fill="close":
+#            11-27       11-29             12-02
+#    bar     14:30 15:30 10:30 11:30 12:30 11:30 12:30
+#    O        99   100   101   102   104   106   107
+#    C       100   101   102   104   105   107   108
+#    11-29 has no 09:30 bar; 12-02 has no 09:30 or 10:30 bar.
+# 3. Fill (B2, "close"): 11-27 15:30 at C = 100, n = 1000/100 = 10.
+# 4. Marks and values (V = 10 P):
+#    - 11-27 15:30 (fill)                       1000
+#    - 11-27 16:00 (C of 15:30 bar, 101)        1010
+#    - 11-29 10:30: open mark at the first available bar's start, valued at
+#      its open, 101 (B1.6)                     1010
+#    - 11-29 11:30 (C 102), 12:30 (C 104), 13:00 (C 105): 1020, 1040, 1050
+#    - 12-02 11:30: open mark at the 11:30 bar's start, open 106: 1060
+#    - 12-02 12:30 (C 107), 13:30 (C 108): 1070, 1080
+# 5. Classes:
+#    - 11-27 16:00: regular
+#    - 11-29 10:30: from the 11-27 close to an open mark after the session
+#      open: irregular (B1.6)
+#    - 11-29 11:30: open mark to the bar's close, regular; 12:30, 13:00 regular
+#    - 12-02 11:30: irregular (B1.6); 12:30, 13:30 regular
+# 6. Warning (B1.6): "a warning gives the count of such sessions": 2. The
+#    entry also accepts B4.1's warning counting the same 2 irregular returns,
+#    since B1.6 is a special case of B4.1.
+rule: [B1.6, B1.1, B4.1]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00",
+         "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+         "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [99.0, 100.0, 101.0, 102.0, 104.0, 106.0, 107.0]
+    Close:
+      AAA: [100.0, 101.0, 102.0, 104.0, 105.0, 107.0, 108.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: close
+expected:
+  labels: ["2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+           "2024-11-29T13:00:00-05:00",
+           "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 1010.0, 1020.0, 1040.0, 1050.0, 1060.0, 1070.0, 1080.0]
+  classes: [regular, irregular, regular, regular, regular, irregular, regular, regular]
+  warns:
+    - {match: "first bar|session|open|irregular", count: 2}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

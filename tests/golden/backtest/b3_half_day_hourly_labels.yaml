@@ -1,0 +1,26 @@
+# B3: hourly bar labels on a half-day, 2024-11-29 (the day after Thanksgiving).
+#
+# Derivation
+# 1. XNYS closes early at 13:00 on 2024-11-29; the session runs 09:30-13:00
+#    America/New_York, which is EST (UTC-05:00) after 2024-11-03.
+# 2. The input bars are labelled at their start on a :30 hourly grid:
+#    09:30, 10:30, 11:30, 12:30. The bar size is 1 hour.
+# 3. B3: each value is labelled at its bar's close, "session close on a
+#    half-day; the bar's actual end for a short last bar".
+#    - 09:30 bar -> 09:30 + 1h = 10:30
+#    - 10:30 bar -> 11:30
+#    - 11:30 bar -> 12:30
+#    - 12:30 bar -> 12:30 + 1h = 13:30 is after the 13:00 close, so the bar
+#      ends at the session close: 13:00.
+# 4. The input is tz-aware on the exchange clock, so the labels stay on it.
+rule: [B3]
+kind: close_times
+inputs:
+  index: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+          "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  index_tz: America/New_York
+expected:
+  labels: ["2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+tolerance: 0  # labels only, compared exactly

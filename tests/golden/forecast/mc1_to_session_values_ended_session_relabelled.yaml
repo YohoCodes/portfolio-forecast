@@ -1,0 +1,42 @@
+# MC1: the marks of mc1_to_session_values_live_session_dropped with `now`
+# after the last session's close: that session has ended without its final
+# bars, so its last value is labelled at its close, with the short-session
+# warning (one session).
+#
+# Derivation
+# 1. Hourly marks (XNYS, EST UTC-05:00), fill="open", both sessions normal
+#    (close 16:00):
+#    - 2024-12-02: 09:30 100 (br0), 10:30 100.6, 11:30 101.1, 12:30 100.9,
+#      13:30 101.4, 14:30 101.8, 15:30 101.5, 16:00 102.0. Last mark at the
+#      close.
+#    - 2024-12-03: 09:30 102.3, 10:30 102.8, 11:30 102.5, 12:30 103.1. The
+#      history ends here, with the last mark 12:30 before the 16:00 close.
+# 2. now = 2024-12-03 16:30 EST. The last session's close, 12-03 16:00, is at
+#    or before now: the session is kept, and since its last mark (12:30) is
+#    before its close, MC1 labels its last value at the close: 12-03 16:00
+#    -> 103.1.
+# 3. Output: 12-02 09:30 -> 100 (br0), 12-02 16:00 -> 102.0, 12-03 16:00
+#    -> 103.1. Values are copied, not computed.
+# 4. Warning (MC1): exactly one, one line, in the fixed wording, with k = 1
+#    (12-03 only; 12-02 ends at its close) and the date 2024-12-03:
+#    "1 session(s) end before their close, first 2024-12-03: each one's last
+#    value is labelled at its close".
+rule: [MC1]
+kind: to_session_values
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.6, 101.1, 100.9, 101.4, 101.8, 101.5, 102.0,
+           102.3, 102.8, 102.5, 103.1]
+  now: "2024-12-03T16:30:00-05:00"
+expected:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00"]
+  tz: America/New_York
+  values: [100.0, 102.0, 103.1]
+  warns:
+    - {match: '^(?-i:1 session\(s\) end before their close, first 2024-12-03: each one''s last value is labelled at its close)\Z'}
+tolerance: {abs: 1.0e-12}

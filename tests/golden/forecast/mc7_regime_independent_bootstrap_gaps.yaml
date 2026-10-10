@@ -1,0 +1,40 @@
+# MC7: gap_model = "independent" with bootstrap = True: the HMM runs on regular
+# marks only and every future gap draws from the whole gap pool. A
+# zero-variance gap pool makes every simulated gap known.
+#
+# History (generated, test_golden.generated_history, seed 41): 60 XNYS
+# sessions from 2024-01-02 (to 2024-03-27), fill="open", 30-minute grid.
+#   gap: l = 0.004 exactly (59 gaps)
+#   regular: two-state chain, P = [[0.95, 0.05], [0.05, 0.95]],
+#            N(0.001, 0.001^2) and N(-0.001, 0.004^2) (780 bars)
+#
+# Derivation
+# 1. "independent": gaps are outside the HMM; bootstrap = True draws them from
+#    the whole gap pool {0.004} x 59 (MC7, third bullet), so every future gap
+#    l is 0.004 whatever the regime or seed.
+# 2. min_sample per class under "independent": 59 gaps >= 30.
+# 3. The regular draws are random; only the gaps are checked: every l at a
+#    future gap mark equals 0.004 (sim_length = 5 sessions, n_sims = 20:
+#    100 gap draws).
+# Tolerance: 1e-12 absolute (l read back from the path ratio).
+rule: [MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: sessions
+    calendar: XNYS
+    start: "2024-01-02"
+    sessions: 60
+    grid: 30min
+    seed: 41
+    gap: {constant: 0.004}
+    regular:
+      regimes: {P: [[0.95, 0.05], [0.05, 0.95]], means: [0.001, -0.001], sds: [0.001, 0.004]}
+  sim_length: 5
+  n_sims: 20
+  random_state: 42
+  options: {n_regimes: 2, gap_model: independent, bootstrap: true}
+expected:
+  fit_none: false
+  gap_draws: 0.004
+tolerance: {abs: 1.0e-12}

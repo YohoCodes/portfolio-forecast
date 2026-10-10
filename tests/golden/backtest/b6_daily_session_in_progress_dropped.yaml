@@ -1,0 +1,18 @@
+# B6: today's daily bar is in progress before the session close and is dropped.
+#
+# Derivation
+# 1. Input: daily bars (naive dates) 2024-12-02, 2024-12-03, consecutive XNYS
+#    sessions; closes (B3) 12-02 16:00 and 12-03 16:00 EST.
+# 2. now = 2024-12-03 15:59 EST:
+#    - 12-02 16:00 <= now keep
+#    - 12-03 16:00 >  now drop (the session has a minute to run)
+# 3. No UserWarning.
+rule: [B6]
+kind: completed_mask
+inputs:
+  index: ["2024-12-02", "2024-12-03"]
+  now: "2024-12-03T15:59:00-05:00"
+expected:
+  mask: [true, false]
+  warns: []
+tolerance: 0  # booleans, compared exactly

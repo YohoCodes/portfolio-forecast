@@ -1,0 +1,26 @@
+# U3, M1, MC1: to_session_values in continuous mode keeps the value at the
+# last mark at or before each 00:00 UTC, so its returns are the M1
+# calendar-day series. The series starts and ends at 00:00 UTC, so no partial
+# day is involved.
+#
+# Derivation
+# 1. calendar=None. Marks every 6 hours: 2024-12-01 00:00, 06:00, 12:00,
+#    18:00, 12-02 00:00, 06:00, 12:00, 18:00, 12-03 00:00 UTC, values 100, 102,
+#    101, 103, 104, 106, 103, 105, 107.
+# 2. Boundaries 00:00 UTC within the series: 12-01, 12-02, 12-03. The last
+#    mark at or before each is the mark at that instant (M1: D_t).
+# 3. Output: 12-01 00:00 -> 100.0, 12-02 00:00 -> 104.0, 12-03 00:00 -> 107.0.
+#    Values are copied, not computed.
+rule: [U3, MC1, M1]
+kind: to_session_values
+inputs:
+  calendar: null
+  labels: ["2024-12-01T00:00:00+00:00", "2024-12-01T06:00:00+00:00", "2024-12-01T12:00:00+00:00",
+           "2024-12-01T18:00:00+00:00", "2024-12-02T00:00:00+00:00", "2024-12-02T06:00:00+00:00",
+           "2024-12-02T12:00:00+00:00", "2024-12-02T18:00:00+00:00", "2024-12-03T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 102.0, 101.0, 103.0, 104.0, 106.0, 103.0, 105.0, 107.0]
+expected:
+  labels: ["2024-12-01T00:00:00+00:00", "2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00"]
+  values: [100.0, 104.0, 107.0]
+tolerance: {abs: 1.0e-12}  # values copied, not computed

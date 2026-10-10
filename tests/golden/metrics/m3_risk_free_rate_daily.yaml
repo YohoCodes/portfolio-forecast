@@ -1,0 +1,28 @@
+# M3, M7: a risk-free rate enters as r_f/252 per session, in Sharpe, Sortino
+# and the downside deviation; volatility is unchanged.
+#
+# Derivation
+# 1. Book D of m1_daily_fill_open_report.yaml, risk_free_rate = 0.0252, so
+#    r_f/252 = 0.0001 per session.
+# 2. Risk series R = [0.02, -0.01, 0.02] (R_1 partial, excluded, M2);
+#    excess e = R - 0.0001 = [0.0199, -0.0101, 0.0199]; mean ebar = 0.0099.
+# 3. Annualized Volatility: on R, unchanged, sqrt(0.0756) = 0.2749545417.
+# 4. Sharpe = ebar / sd(R) x sqrt(252) = 0.0099/0.0173205081 x 15.8745078664
+#    = 9.0734998760.
+# 5. DD = sqrt(0.0101^2/3) = 0.0058312377; Downside Volatility = DD sqrt(252)
+#    = 0.0925680290; Sortino = 0.0099 sqrt(252)/DD = 26.9509897307.
+rule: [M3, M7]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 103.02, 101.9898, 104.029596]
+  risk_free_rate: 0.0252
+expected:
+  report:
+    Annualized Volatility: 0.2749545416973504
+    Sharpe Ratio: 9.073499876012566
+    Downside Volatility: 0.09256802903810797
+    Sortino Ratio: 26.950989730730388
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

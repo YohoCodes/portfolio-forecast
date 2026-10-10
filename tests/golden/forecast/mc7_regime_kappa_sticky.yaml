@@ -1,0 +1,41 @@
+# MC7: a large kappa (sticky Dirichlet prior, MAP) makes the regimes persist:
+# simulated run lengths far longer than the history's.
+#
+# History: a plain array (generated, test_golden.generated_history, seed 31):
+# 3000 returns from a two-state Markov chain started in state 0,
+#   P = [[0.9, 0.1], [0.1, 0.9]],
+#   state 0: l ~ N(+0.02, 0.002^2),  state 1: l ~ N(-0.02, 0.002^2).
+# The two emissions are 20 standard deviations apart, so the regime of every
+# l, history or simulated, is its sign (P(wrong sign) = P(Z > 10) < 1e-22).
+# On this seed the history switches sign at 9.57% of its 2999 steps and is
+# 49.8% positive.
+#
+# Derivation
+# 1. M-step: P_hat_ij proportional to xi_ij + kappa 1[i = j]. Each state is
+#    occupied about 1500 times with about 150 switches out, so with
+#    kappa = 1e6: 1 - P_hat_ii = 150/(1500 + 1e6) = 1.5e-4 (mean run length
+#    about 6,700 steps), against 0.1 at kappa = 0
+#    (mc7_regime_kappa_zero_switch_rate).
+# 2. Emissions are still identified: the transition penalty ln(1.5e-4) = -8.8
+#    is small against the emission log-likelihood ratio of a wrong state,
+#    0.04^2/(2 x 0.002^2) = 200, so the two states stay at +/-0.02.
+# 3. Simulated switches over 200 x 99 = 19,800 pairs: Poisson with mean
+#    19,800 x 1.5e-4 = 3. Bound: at most 0.002 (about 40 switches; P(Poisson(3)
+#    >= 40) < 1e-25), against 0.1 without the prior.
+rule: [MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: array
+    returns: 3000
+    seed: 31
+    regular:
+      regimes: {P: [[0.9, 0.1], [0.1, 0.9]], means: [0.02, -0.02], sds: [0.002, 0.002]}
+  sim_length: 100
+  n_sims: 200
+  random_state: 33
+  options: {n_regimes: 2, kappa: 1000000.0}
+expected:
+  dates_none: true
+  switch_rate: {max: 0.002}
+tolerance: 0  # bounds in expected

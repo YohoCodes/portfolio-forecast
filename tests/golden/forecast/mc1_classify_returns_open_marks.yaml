@@ -1,0 +1,28 @@
+# MC1: classify_returns infers classes from labels: a return ending at an open
+# mark at the session open is a gap, others regular.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-29 (half-day 09:30-13:00) 09:30,
+#    10:30, 11:30, 12:30, 13:00; 2024-12-02 (09:30-16:00) 09:30, 10:30, 11:30.
+#    8 marks, so 7 returns, indexed by the mark each ends at (labels 2..8).
+# 2. Each session's first mark is its open mark. 11-29's 09:30 starts the series
+#    (the fill); no return ends there.
+# 3. Classes:
+#    - ending 11-29 10:30, 11:30, 12:30, 13:00: bar closes, regular
+#    - ending 12-02 09:30: open mark at the 09:30 session open, from the
+#      previous session's last mark: gap
+#    - ending 12-02 10:30, 11:30: regular
+rule: [MC1]
+kind: classify_returns
+inputs:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 105.0, 106.0]
+expected:
+  labels: ["2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+           "2024-12-02T11:30:00-05:00"]
+  classes: [regular, regular, regular, regular, gap, regular, regular]
+tolerance: 0  # labels and classes, compared exactly

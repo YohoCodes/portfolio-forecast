@@ -1,0 +1,20 @@
+# MC1: an hourly series has several marks in a session, so it is not
+# daily.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-29 09:30 (fill), 10:30, 11:30, 12:30,
+#    13:00; 2024-12-02 09:30 (open mark), 10:30, 11:30.
+# 2. 11-29 has five marks and 12-02 three; 12-02's 09:30 open mark is not an
+#    initial fill mark, and 12-02's marks are not at its 16:00 close.
+# 3. MC1: not daily (intraday).
+rule: [MC1]
+kind: is_daily
+inputs:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 105.0, 106.0]
+expected:
+  value: false
+tolerance: 0  # a boolean

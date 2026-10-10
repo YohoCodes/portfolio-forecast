@@ -1,0 +1,36 @@
+# MC2, MC8: future layout across Thanksgiving, the half-day after it, and a
+# weekend. n = 2 sessions.
+#
+# Derivation
+# 1. History (XNYS, EST UTC-05:00): 2024-11-27 (Wednesday) 09:30 (fill), bar
+#    closes 10:30, 11:30, 12:30, 13:30, 14:30, 15:30, 16:00. Grid: hourly on :30,
+#    Delta = 1 hour. It ends at the session close.
+# 2. Next sessions: 11-28 is Thanksgiving (closed); 11-29 (Friday) is a half-day,
+#    09:30-13:00; 11-30 and 12-01 are the weekend; 12-02 (Monday) 09:30-16:00.
+#    n = 2 gives 11-29 and 12-02.
+# 3. 11-29: 09:30 gap (tau 1; one gap is one unit however long, U2); closes
+#    10:30, 11:30, 12:30 regular (tau 1); 13:00 closes the 12:30 bar at the
+#    early close: regular, tau = 30/60 = 0.5. 5 marks.
+# 4. 12-02: 09:30 gap (tau 1, across the weekend); 10:30, 11:30, 12:30, 13:30,
+#    14:30, 15:30 regular (tau 1); 16:00 regular, tau 0.5. 8 marks.
+# 5. 13 marks in all.
+rule: [MC2, MC8]
+kind: next_trading_dates
+inputs:
+  labels: ["2024-11-27T09:30:00-05:00", "2024-11-27T10:30:00-05:00", "2024-11-27T11:30:00-05:00",
+           "2024-11-27T12:30:00-05:00", "2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00",
+           "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 103.5, 105.0]
+  n: 2
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  classes: [gap, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  tau: [1.0, 1.0, 1.0, 1.0, 0.5,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5]
+tolerance: {abs: 1.0e-12}  # tau; labels and classes exact

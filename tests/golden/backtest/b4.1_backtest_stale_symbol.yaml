@@ -1,0 +1,53 @@
+# B4.1: one held symbol misses a mid-session bar. Its last price is carried
+# forward (P_i(t), forward fill), both returns touching the stale mark are
+# irregular, and one warning counts them.
+#
+# Derivation
+# 1. Calendar: 2024-11-29, XNYS half-day 09:30-13:00 EST (UTC-05:00). Hourly
+#    bars 09:30, 10:30, 11:30, 12:30 (the last ends at 13:00).
+# 2. Weights AAA 0.5, BBB 0.5; br0 = 1000; fill="open".
+#    bar     09:30 10:30 11:30 12:30
+#    AAA O   100   101   102   103
+#    AAA C   101   102   103   104
+#    BBB O    50   null  51    51.5
+#    BBB C    50.5 null  51.5  52
+# 3. Fill at the 09:30 open: n_AAA = 500/100 = 5, n_BBB = 500/50 = 10.
+# 4. Marks (as in b4.1_mid_session_missing_bar.yaml): 09:30, 10:30, 11:30,
+#    12:30, 13:00. AAA has a bar at 10:30, so the 11:30 mark exists.
+# 5. Values. Close marks are valued at closes (B1.3, V(C_{d,k})); BBB has no
+#    close at 11:30, so its last known close, 50.5 (10:30), is carried
+#    forward (B4.1). BBB's 11:30 bar open, 51, is not a close and is not used,
+#    as in the Phase 1 freshness case.
+#    - 09:30: 5*100 + 10*50   = 1000
+#    - 10:30: 5*101 + 10*50.5 = 1010
+#    - 11:30: 5*102 + 10*50.5 = 1015  (BBB stale)
+#    - 12:30: 5*103 + 10*51.5 = 1030
+#    - 13:00: 5*104 + 10*52   = 1040
+# 6. Classes: 10:30 regular; 11:30 irregular (BBB stale at the end); 12:30
+#    irregular (BBB stale at the start); 13:00 regular.
+# 7. Warning (B4.1, "counted in a warning"): 2 irregular returns.
+rule: [B4.1, B1.1]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+         "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 102.0, 103.0]
+      BBB: [50.0, null, 51.0, 51.5]
+    Close:
+      AAA: [101.0, 102.0, 103.0, 104.0]
+      BBB: [50.5, null, 51.5, 52.0]
+  w: {AAA: 0.5, BBB: 0.5}
+  br0: 1000
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 1015.0, 1030.0, 1040.0]
+  classes: [regular, irregular, irregular, regular]
+  warns:
+    - {match: "irregular|stale|fresh|missing", count: 2}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

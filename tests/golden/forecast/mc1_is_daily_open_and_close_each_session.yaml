@@ -1,0 +1,21 @@
+# MC1: an open mark and a close mark in every session (one full-session
+# intraday bar a day) is intraday, not daily: only the first session may carry
+# an extra (fill) mark.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-25 09:30, 16:00; 11-26 09:30, 16:00;
+#    11-27 09:30, 16:00.
+# 2. 11-25: fill mark plus close, allowed. 11-26 and 11-27: two marks each, the
+#    09:30 one not at the session close and not the initial fill.
+# 3. MC1: at most one mark per session at its close fails on 11-26, so not
+#    daily; it has several marks per session, so it takes the intraday path.
+rule: [MC1]
+kind: is_daily
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T16:00:00-05:00", "2024-11-26T09:30:00-05:00",
+           "2024-11-26T16:00:00-05:00", "2024-11-27T09:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 101.5, 102.0, 101.0, 103.0]
+expected:
+  value: false
+tolerance: 0  # a boolean

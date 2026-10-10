@@ -1,0 +1,25 @@
+# M7: no session below target and a zero mean excess: Sortino is NaN, not
+# +inf, and one warning, in the exact wording, gives n = 2 sessions.
+#
+# Derivation
+# 1. Daily values at XNYS closes (EST UTC-05:00): 2024-12-02 16:00, 12-03,
+#    12-04, all 100. R = [0, 0] (both kept: daily, starting at a close, M2),
+#    r_f = 0: e = [0, 0], ebar = 0, DD = 0.
+# 2. M7: DD = 0 and ebar = 0: Sortino = NaN. Downside Volatility = 0.
+# 3. Exactly one warning, one line, in M7's wording for this case with
+#    n = 2 (every session returns exactly r_f): "Sortino ratio is NaN: all 2
+#    sessions return exactly the risk-free rate". No infinite-Sortino warning
+#    (Sortino is not +inf).
+rule: [M7]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.0, 100.0]
+expected:
+  report:
+    Sortino Ratio: .nan
+    Downside Volatility: 0.0
+  warns:
+    - {match: '^(?-i:Sortino ratio is NaN: all 2 sessions return exactly the risk-free rate)\Z'}
+tolerance: {abs: 1.0e-12}

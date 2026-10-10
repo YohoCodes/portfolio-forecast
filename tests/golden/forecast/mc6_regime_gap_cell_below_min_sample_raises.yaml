@@ -1,0 +1,34 @@
+# MC6, MC7: under gap_model="regime" min_sample applies per (regime, gap)
+# cell (MC6): with n_regimes given and a cell below it, the call
+# raises with the counts.
+#
+# History (generated, test_golden.generated_history, seed 71): 20 XNYS
+# sessions from 2024-01-02, fill="open", 30-minute grid: 19 gaps
+# (N(-0.01, 0.01^2)) and 260 regular bars (N(0.0005, 0.002^2)).
+#
+# Derivation
+# 1. n_regimes = 1: the one regime's expected gap occupancy is every gap,
+#    sum_t gamma_t(1) = 19 over the gap marks.
+# 2. 19 < 30 = min_sample (default): with n_regimes given, ValueError naming
+#    the count 19 (MC6). Every class has n_c >= 2S = 2 and n >= k, so
+#    the fit itself is possible; only min_sample fails.
+rule: [MC6, MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: sessions
+    calendar: XNYS
+    start: "2024-01-02"
+    sessions: 20
+    grid: 30min
+    seed: 71
+    gap: {mean: -0.01, sd: 0.01}
+    regular: {mean: 0.0005, sd: 0.002}
+  sim_length: 1
+  n_sims: 2
+  random_state: 0
+  options: {n_regimes: 1, gap_model: regime}
+expected:
+  raises: ValueError
+  match: '(?<![\d.:/-])19(?![\d.:/-])'
+tolerance: 0  # raise only

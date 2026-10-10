@@ -1,0 +1,33 @@
+# M12, U3: in continuous mode a series with fewer than two UTC day
+# boundaries has no calendar-day return: volatility, Sharpe and Sortino are
+# NaN, with a warning; the other figures are still computed.
+#
+# Derivation
+# 1. calendar=None. Hourly marks 2024-12-01 22:00, 23:00, 12-02 00:00, 01:00
+#    UTC, values 100, 101, 102, 103. One boundary inside the series, 12-02
+#    00:00: fewer than two.
+# 2. U3: "M12 fewer than two UTC day boundaries -> vol/Sharpe/Sortino NaN
+#    with a warning": Annualized Volatility, Sharpe Ratio, Sortino Ratio NaN.
+#    One UserWarning (wording not fixed; it should name the UTC day or the
+#    boundaries).
+# 3. Total Return = 103/100 - 1 = 0.03 (from br0, unaffected; M2).
+#    Max Drawdown = 0 (the series only rises).
+rule: [M12, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-12-01T22:00:00+00:00", "2024-12-01T23:00:00+00:00",
+           "2024-12-02T00:00:00+00:00", "2024-12-02T01:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 101.0, 102.0, 103.0]
+  cagr_clock: calendar
+expected:
+  report:
+    Total Return: 0.03
+    Max Drawdown: 0.0
+    Annualized Volatility: .nan
+    Sharpe Ratio: .nan
+    Sortino Ratio: .nan
+  warns:
+    - {match: "UTC|day|boundar"}
+tolerance: {abs: 1.0e-12}

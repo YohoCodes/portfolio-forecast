@@ -1,0 +1,40 @@
+# M12, U3: continuous statistical_report on paths spanning fewer than
+# two 00:00 UTC boundaries: no full UTC day, so volatility, Sharpe and Sortino
+# are NaN on every path, with a warning; Total Return and drawdown are still
+# computed.
+#
+# SimulationResult (by hand, fit None): hourly 24/7 paths from 2024-12-02
+# 20:00 UTC (column 0); dates 21:00, 22:00, 23:00, 12-03 00:00, 01:00 UTC;
+# regular.
+#   Q1: 1, 1.01, 1.02, 1.015, 1.03, 1.04
+#   Q2: 1, 0.99, 0.995, 1.0, 0.98, 0.985
+# calendar=None, cagr_clock="calendar".
+#
+# Derivation
+# 1. UTC day boundaries in [20:00, 01:00]: 12-03 00:00 only, fewer than two:
+#    M12 (U3): Annualized Volatility, Sharpe and Sortino NaN per path, with a
+#    warning naming the UTC day or the boundaries.
+# 2. Total Return: Q1 0.04, Q2 -0.015. Max Drawdown: Q1 peak 1.02, then
+#    1.015: 1 - 1.015/1.02 = 0.0049019608; Q2 1 - 0.98/1 = 0.02.
+rule: [M12, U3]
+kind: statistical_report
+inputs:
+  calendar: null
+  cagr_clock: calendar
+  simulation:
+    dates: ["2024-12-02T21:00:00+00:00", "2024-12-02T22:00:00+00:00", "2024-12-02T23:00:00+00:00",
+            "2024-12-03T00:00:00+00:00", "2024-12-03T01:00:00+00:00"]
+    dates_tz: UTC
+    classes: [regular, regular, regular, regular, regular]
+    paths: [[1.0, 1.01, 1.02, 1.015, 1.03, 1.04],
+            [1.0, 0.99, 0.995, 1.0, 0.98, 0.985]]
+expected:
+  per_path:
+    Total Return: [0.04, -0.015]
+    Max Drawdown: [0.004901960784313725, 0.02]
+    Annualized Volatility: [.nan, .nan]
+    Sharpe Ratio: [.nan, .nan]
+    Sortino Ratio: [.nan, .nan]
+  warns:
+    - {match: "UTC|day|boundar"}
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

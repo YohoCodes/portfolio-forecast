@@ -1,0 +1,30 @@
+# B3, B2: weekly bars with fill="close". The fill is labelled at the close of
+# the first bar's last session; there is no open mark.
+#
+# Derivation
+# 1. Input: weekly bars (naive dates, each week's Monday) 2024-11-18,
+#    2024-11-25, 2024-12-02. One symbol, A, held.
+# 2. Session spans (XNYS, EST UTC-05:00), as in b3_weekly_bar_session_span:
+#    last closes 11-22 16:00, 11-29 13:00 (half-day), 12-06 16:00.
+# 3. B2 fill="close": V_0 at the first bar's close, labelled at its s_last
+#    close, 11-22 16:00; then each bar's s_last close: 11-29 13:00, 12-06 16:00.
+#    3 marks, 2 returns.
+# 4. A fresh everywhere (own close at each close).
+# 5. Classes: weekly is daily-or-longer, one class: all "regular" (U1).
+rule: [B3, B2]
+kind: history_marks
+inputs:
+  bars: ["2024-11-18", "2024-11-25", "2024-12-02"]
+  opens:
+    A: [100.0, 101.0, 102.0]
+  closes:
+    A: [101.0, 102.0, 103.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-11-22T16:00:00-05:00", "2024-11-29T13:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true]
+  classes: [regular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

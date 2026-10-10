@@ -2,6 +2,7 @@
 Data/
 # PDFs from compile_statistical_reports
 /Reporting/
+/demos/Reporting/
 
 venv/
 .venv/

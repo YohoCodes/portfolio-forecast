@@ -1,0 +1,21 @@
+# M10: calculate_period_returns gives the return between every pair of
+# consecutive marks, open marks included, indexed by the mark each ends at.
+#
+# Derivation
+# 1. Hourly marks (XNYS, EST UTC-05:00): 2024-11-29 (half-day) 11:30 100,
+#    12:30 101, 13:00 100; 2024-12-02 09:30 (open mark) 95, 10:30 98.
+# 2. Returns: 101/100 - 1 = 0.01 (12:30); 100/101 - 1 = -0.0099009901 (13:00,
+#    a short bar: no scaling here, raw simple returns); 95/100 - 1 = -0.05
+#    (12-02 09:30, the gap); 98/95 - 1 = 0.0315789474 (10:30).
+rule: [M10]
+kind: calculate_period_returns
+inputs:
+  labels: ["2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.0, 95.0, 98.0]
+expected:
+  labels: ["2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  values: [0.01, -0.009900990099009901, -0.05, 0.031578947368421054]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

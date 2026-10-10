@@ -1,0 +1,46 @@
+# B4.1: one held symbol has no open on session 2's first bar, so it is stale at
+# the open mark and both returns touching that mark are irregular.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-29 half-day 09:30-13:00; 2024-12-02
+#    09:30-16:00. Bars on a :30 hourly grid. Symbols A and B, both held (w > 0).
+# 2. Bars: 11-29 09:30, 10:30, 11:30, 12:30; 12-02 09:30, 10:30. Every price is
+#    present except B's open on the 12-02 09:30 bar (null).
+# 3. Marks (B1.1, B2, B3, fill="open"): 11-29 09:30 (fill), 10:30, 11:30, 12:30,
+#    13:00; 12-02 09:30 (open mark: the 09:30 bar is present for A, so the
+#    session's first bar starts at the open), 10:30, 11:30. 8 marks, 7 returns.
+# 4. Freshness (own price at the mark, not carried forward):
+#    - A: own open at both open marks, own close at every close: all true.
+#    - B: at 12-02 09:30 B has no open; its value there is its 11-29 close
+#      carried forward, so B is stale (false). Everywhere else true.
+# 5. Classes (B4.1: keeps its class only if every held symbol is fresh at both
+#    marks):
+#    - 11-29 10:30 ... 13:00: regular (A and B fresh at both ends)
+#    - 12-02 09:30: would be gap; B stale at its end mark: irregular
+#    - 12-02 10:30: would be regular (first bar, open to close); B stale at
+#      its start mark: irregular
+#    - 12-02 11:30: regular
+rule: [B4.1, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00", "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0, 105.0, 106.0]
+    B: [50.0, 50.5, 51.0, 51.5, null, 53.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0, 106.0, 107.0]
+    B: [50.5, 51.0, 51.5, 52.0, 53.0, 53.5]
+  held: {A: true, B: true}
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true, true, true, true]
+    B: [true, true, true, true, true, false, true, true]
+  classes: [regular, regular, regular, regular, irregular, irregular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

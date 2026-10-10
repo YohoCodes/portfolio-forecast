@@ -1,0 +1,48 @@
+# B4.1: a mid-session bar missing for every held symbol, in the
+# backtest. Values are the prices at the marks that exist; the return spanning
+# the missing mark is irregular and counted in the warning.
+#
+# Derivation
+# 1. Calendar: 2024-11-29, XNYS half-day 09:30-13:00 EST (UTC-05:00); hourly
+#    grid 09:30, 10:30, 11:30, 12:30 (short, to 13:00).
+# 2. Bars 09:30, 10:30, 12:30 (no 11:30 row); weights AAA 0.5, BBB 0.5;
+#    br0 = 1000; fill="open".
+#    bar     09:30 10:30 12:30
+#    AAA O   100   101   103
+#    AAA C   101   102   104
+#    BBB O    50    50.5  51.5
+#    BBB C    50.5  51    52
+# 3. n_AAA = 500/100 = 5, n_BBB = 500/50 = 10.
+# 4. Marks (as in b4.1_mid_session_bar_missing_all.yaml) and values:
+#    - 09:30 (fill): 5*100 + 10*50   = 1000
+#    - 10:30:        5*101 + 10*50.5 = 1010
+#    - 11:30:        5*102 + 10*51   = 1020
+#    - 13:00:        5*104 + 10*52   = 1040  (no mark at 12:30)
+# 5. Classes: regular, regular, irregular (span 11:30-13:00 contains the
+#    scheduled 12:30 mark, missing for both symbols; B4.1).
+# 6. Warning: 1 irregular return, counted in B4.1's warning (B4.1: "counted in
+#    the warning").
+rule: [B4.1]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 103.0]
+      BBB: [50.0, 50.5, 51.5]
+    Close:
+      AAA: [101.0, 102.0, 104.0]
+      BBB: [50.5, 51.0, 52.0]
+  w: {AAA: 0.5, BBB: 0.5}
+  br0: 1000
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+           "2024-11-29T11:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 1020.0, 1040.0]
+  classes: [regular, regular, irregular]
+  warns:
+    - {match: "irregular|missing", count: 1}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

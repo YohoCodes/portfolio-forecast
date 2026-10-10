@@ -1,0 +1,17 @@
+# M4, U3: in continuous mode there are no sessions, so
+# cagr_clock="session" raises ValueError.
+#
+# Derivation
+# 1. calendar=None, values at 00:00 UTC on 2024-11-30, 12-01, 12-02.
+# 2. U3: "M4 calendar clock only (cagr_clock="session" raises)".
+rule: [M4, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-11-30T00:00:00+00:00", "2024-12-01T00:00:00+00:00", "2024-12-02T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 102.0, 100.98]
+  cagr_clock: session
+expected:
+  raises: ValueError
+tolerance: 0  # no output; the call must raise

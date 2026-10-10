@@ -1,0 +1,49 @@
+# M2: risk figures are identical under both fills. Book I of
+# m1_intraday_three_session_report.yaml as fill="close" would give it: no
+# 09:30 fill mark, the first value at the first bar's close.
+#
+# Derivation
+# 1. Values: Book I without its first mark, so the series starts at 11-29
+#    10:30 with 101 (as if br0 = 101; risk figures do not depend on the scale).
+#    Classes: S1 regular x 3; S2 gap, regular x 7; S3 gap, regular x 7.
+# 2. Session returns (M1, M2): R_1 runs from 11-29 10:30 (C_{1,1}) to 13:00, a
+#    partial session 1, excluded. R_2 = 102/100 - 1 = 0.02,
+#    R_3 = 100.98/102 - 1 = -0.01, the same as under fill="open".
+# 3. Hence, as in the fill="open" case: Annualized Volatility sqrt(0.1134),
+#    Sharpe sqrt(14), Downside Volatility sqrt(0.0126), Sortino sqrt(126).
+# 4. Total Return and CAGR do differ (they start at br0, M2): Total Return
+#    = 100.98/101 - 1 = -0.0001980198; N = 3 session closes after the fill
+#    (S1's 13:00 close is after the 10:30 fill), so
+#    CAGR = (100.98/101)^84 - 1 = -0.0164977078.
+rule: [M2, M1]
+kind: performance_report
+inputs:
+  labels: ["2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00", "2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00",
+           "2024-12-03T15:30:00-05:00", "2024-12-03T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [101.0, 101.0, 101.0, 100.0,
+           95.0, 98.0, 98.0, 98.0, 98.0, 98.0, 98.0, 102.0,
+           103.0, 103.0, 103.0, 103.0, 103.0, 103.0, 103.0, 100.98]
+  as_backtest_result: true
+  classes: [regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  interval: "1 hour"
+expected:
+  report:
+    Total Return: -0.00019801980198019802
+    CAGR: -0.016497707781535698
+    Annualized Volatility: 0.3367491648096547
+    Sharpe Ratio: 3.7416573867739413
+    Downside Volatility: 0.11224972160321824
+    Sortino Ratio: 11.224972160321824
+    Daily Returns:
+      labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00"]
+      values: [0.02, -0.01]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

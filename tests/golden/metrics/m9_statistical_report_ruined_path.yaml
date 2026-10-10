@@ -1,0 +1,67 @@
+# M9: statistical_report keeps a ruined path in every summary and warns with
+# the count of ruined paths. On that path CAGR = -100%, the 0/0 return after
+# ruin is excluded and the risk figures use the returns up to the -100% one.
+# No path has an infinite Sortino ratio, so its mean stays finite (M7).
+#
+# SimulationResult (by hand, fit None): three daily paths from the 2024-12-02
+# close to the XNYS closes of 12-03, 12-04, 12-05 (EST), all regular.
+#   P1: 1, 0.5, 0, 0              (ruined at 12-04)
+#   P2: 1, 1.02, 0.9996, 1.019592  R = [0.02, -0.02, 0.02]
+#   P3: 1, 0.98, 0.9898, 0.979902  R = [-0.02, 0.01, -0.01]
+#
+# Derivation
+# 1. P1 (M9, as m9_total_loss): R = [-0.5, -1.0]; 0/0 at 12-05 excluded.
+#    Total Return -1; CAGR -1; Max Drawdown 1; vol sqrt(0.125 x 252)
+#    = 5.6124860802; Sharpe -0.75/0.3535533906 x sqrt(252) = -33.6749164810;
+#    DD = sqrt(0.625): Downside Volatility 12.5499003980, Sortino
+#    -15.0598804776.
+# 2. P2, P3: as m7_statistical_report_infinite_sortino_path, steps 2-6.
+# 3. Kept in every summary (percentiles linear in the order statistics,
+#    h = (n - 1) p):
+#    Total Return [-1, 0.019592, -0.020098]: Mean -1.000506/3 = -0.333502;
+#      Median -0.020098; Lower -1 + 0.05 (0.979902) = -0.9510049; Upper
+#      -0.020098 + 0.95 (0.03969) = 0.0176075.
+#    CAGR [-1, 4.1029253386, -0.8183053657]: Mean 0.7615399910; Median
+#      -0.8183053657; Lower -1 + 0.05 (0.1816946343) = -0.9909152683; Upper
+#      -0.8183053657 + 0.95 (4.9212307043) = 3.8568638034.
+#    Max Drawdown [1, 0.02, 0.020098]: Mean 1.040098/3 = 0.3466993333; Median
+#      0.020098; Lower 0.02 + 0.05 (0.000098) = 0.0200049; Upper 0.020098
+#      + 0.95 (0.979902) = 0.9510049.
+#    Sortino Ratio [-15.0598804776, 9.1651513899, -8.1975606128], sorted
+#      -15.0599, -8.1976, 9.1652; no path is +inf, so the mean stays the
+#      arithmetic mean (M7): Mean -14.0922897005/3 = -4.6974299002; Median
+#      -8.1975606128; Lower -15.0598804776 + 0.05 (6.8623198648)
+#      = -14.7167644844; Upper -8.1975606128 + 0.95 (17.3627120027)
+#      = 8.2970157898.
+# 4. Warning (M9): one, giving the count 1 of ruined paths; no other (no path
+#    has DD = 0).
+# Tolerance: relative 1e-9.
+rule: [M9]
+kind: statistical_report
+inputs:
+  simulation:
+    paths: [[1.0, 0.5, 0.0, 0.0],
+            [1.0, 1.02, 0.9996, 1.019592],
+            [1.0, 0.98, 0.9898, 0.979902]]
+    dates: ["2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+    dates_tz: America/New_York
+    classes: [regular, regular, regular]
+expected:
+  per_path:
+    Total Return: [-1.0, 0.019592, -0.020098]
+    CAGR: [-1.0, 4.102925338577315, -0.8183053657252066]
+    Max Drawdown: [1.0, 0.02, 0.020098]
+    Annualized Volatility: [5.612486080160913, 0.3666060555964676, 0.24248711305964304]
+    Sharpe Ratio: [-33.67491648096547, 4.58257569495584, -6.928203230275509]
+    Downside Volatility: [12.549900398011134, 0.1833030277982338, 0.20493901531919217]
+    Sortino Ratio: [-15.059880477613358, 9.16515138991168, -8.197560612767678]
+  summary:
+    Total Return: {Mean: -0.333502, Median: -0.020098, Lower: -0.9510049, Upper: 0.0176075}
+    CAGR: {Mean: 0.7615399909507027, Median: -0.8183053657252066, Lower: -0.9909152682862603,
+           Upper: 3.8568638033621885}
+    Max Drawdown: {Mean: 0.3466993333333333, Median: 0.020098, Lower: 0.0200049, Upper: 0.9510049}
+    Sortino Ratio: {Mean: -4.697429900156452, Median: -8.197560612767678, Lower: -14.716764484371074,
+                    Upper: 8.297015789777712}
+  warns:
+    - {match: "ruin|total loss|zero|-100", count: 1}
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

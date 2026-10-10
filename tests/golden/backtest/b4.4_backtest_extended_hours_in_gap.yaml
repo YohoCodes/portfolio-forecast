@@ -1,0 +1,49 @@
+# B4.4: post-market and pre-market bars are dropped before marks are
+# built, one warning gives the count (5), and their price moves fall into the
+# gap g_d.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-27 09:30-16:00; 11-28
+#    Thanksgiving; 2024-11-29 half-day 09:30-13:00. Hourly bars on :30.
+# 2. Bars, AAA only (weight 1), br0 = 1000, fill="close":
+#            11-27                     11-29
+#    bar     14:30 15:30 16:30 17:30   06:30 07:30 08:30 09:30 10:30
+#    O        99   100   101   102     103   104   105   106   107
+#    C       100   101   102   103     104   105   106   107   108
+#    16:30 and 17:30 start after the 16:00 close (post-market); 06:30, 07:30,
+#    08:30 start before the 09:30 open (pre-market). 5 bars outside every
+#    session.
+# 3. B4.4: the 5 bars are dropped; one UserWarning with the count 5.
+# 4. Marks and values on the remaining bars (n = 1000/100 = 10):
+#    - 11-27 15:30 (fill, C of 14:30 bar = 100)          1000
+#    - 11-27 16:00 (C of the short 15:30 bar = 101)      1010
+#    - 11-29 09:30 (open mark, O of 09:30 bar = 106)     1060
+#    - 11-29 10:30 (C 107), 11:30 (C 108)                1070, 1080
+# 5. Classes: regular, gap, regular, regular. The gap
+#    g = 1060/1010 - 1 holds the whole off-session move 101 -> 106 (B4.4:
+#    "their price moves fall into g_d").
+rule: [B4.4, B1.4]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00",
+         "2024-11-27T16:30:00-05:00", "2024-11-27T17:30:00-05:00",
+         "2024-11-29T06:30:00-05:00", "2024-11-29T07:30:00-05:00", "2024-11-29T08:30:00-05:00",
+         "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0]
+    Close:
+      AAA: [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: close
+expected:
+  labels: ["2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00", "2024-11-29T09:30:00-05:00",
+           "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 1060.0, 1070.0, 1080.0]
+  classes: [regular, gap, regular, regular]
+  warns:
+    - {match: "outside|session|extended|dropp", count: 5}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

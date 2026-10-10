@@ -1,0 +1,21 @@
+# B6: a daily bar on a half-day is complete once the 13:00 early close has
+# passed, not at 16:00.
+#
+# Derivation
+# 1. Input: daily bars (naive dates) 2024-11-26, 2024-11-27, 2024-11-29; with
+#    Thanksgiving 11-28 closed these are consecutive XNYS sessions.
+# 2. Closes (B3): 11-26 16:00, 11-27 16:00, 11-29 13:00 EST (half-day).
+# 3. now = 2024-11-29 13:30 EST:
+#    - 11-26 16:00 <= now keep
+#    - 11-27 16:00 <= now keep
+#    - 11-29 13:00 <= now keep (an assumed 16:00 close would drop it)
+# 4. No UserWarning.
+rule: [B6]
+kind: completed_mask
+inputs:
+  index: ["2024-11-26", "2024-11-27", "2024-11-29"]
+  now: "2024-11-29T13:30:00-05:00"
+expected:
+  mask: [true, true, true]
+  warns: []
+tolerance: 0  # booleans, compared exactly

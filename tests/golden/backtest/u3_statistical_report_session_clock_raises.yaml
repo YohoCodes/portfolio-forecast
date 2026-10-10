@@ -1,0 +1,23 @@
+# U3, M4: in continuous mode statistical_report has no sessions, so the
+# default cagr_clock="session" raises ValueError (as performance_report,
+# m4_session_clock_raises_continuous).
+#
+# SimulationResult (by hand): two daily 24/7 paths from 2024-12-06 00:00 UTC,
+# dates 12-07, 12-08, 12-09 00:00 UTC, regular; calendar=None; cagr_clock left
+# at its default "session".
+#
+# Derivation
+# 1. U3: "M4 calendar clock only (cagr_clock="session" raises)".
+rule: [U3, M4]
+kind: statistical_report
+inputs:
+  calendar: null
+  simulation:
+    dates: ["2024-12-07T00:00:00+00:00", "2024-12-08T00:00:00+00:00", "2024-12-09T00:00:00+00:00"]
+    dates_tz: UTC
+    classes: [regular, regular, regular]
+    paths: [[1.0, 1.01, 1.0302, 1.019898],
+            [1.0, 0.99, 1.0098, 0.999702]]
+expected:
+  raises: ValueError
+tolerance: 0  # the call must raise

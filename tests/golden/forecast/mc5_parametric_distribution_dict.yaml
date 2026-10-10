@@ -1,0 +1,46 @@
+# MC5: `distribution` as a dict {"gap": ..., "regular": ...} fixes each class's
+# family, with no selection: the fit reports exactly the families given.
+#
+# History (generated, test_golden.generated_history): 60 XNYS sessions from
+# 2024-01-02, fill="open", 30-minute grid, seed 42; gap l ~ N(-0.01, 0.01^2)
+# (59 gaps), regular l ~ N(0.0005, 0.002^2) (780 bars).
+#
+# Derivation
+# 1. distribution = {"gap": scipy.stats.t, "regular": scipy.stats.norm}: the
+#    opposite of what selection would pick on such data, so a reported family
+#    can only come from the dict.
+# 2. Both classes have n >= 30 = min_sample, and n > k (3 for t, 2 for the
+#    normal), so both fit.
+# 3. fit["gap"] reports t; fit["regular"] reports normal.
+# 4. No selection, so "Candidates" is None for both classes; the criterion is
+#    the default "BIC", and each family's BIC equals -2 log L + k ln n at its
+#    reported parameters (k = 3 for t, 2 for the normal) on its pool, which
+#    the runner recomputes from the generated history (30-minute grid,
+#    rho = 1).
+#    The fit's keys are those of parametric_monte_carlo's docstring:
+#    fit[class] has "Distribution" (scipy name), "Parameters" (by name),
+#    "Criterion", the criterion's score under its own name, and
+#    "Candidates" (every candidate's score, lowest first).
+rule: [MC5]
+kind: parametric_monte_carlo
+inputs:
+  generate:
+    kind: sessions
+    calendar: XNYS
+    start: "2024-01-02"
+    sessions: 60
+    grid: 30min
+    seed: 42
+    gap: {mean: -0.01, sd: 0.01}
+    regular: {mean: 0.0005, sd: 0.002}
+  sim_length: 1
+  n_sims: 2
+  random_state: 0
+  options: {distribution: {gap: t, regular: norm}}
+expected:
+  fit_none: false
+  family: {gap: t, regular: normal}
+  fit_report:
+    gap: {criterion: BIC, candidates: null}
+    regular: {criterion: BIC, candidates: null}
+tolerance: 0  # names and keys; scores within 1e-6 relative of the recomputed criterion

@@ -1,0 +1,32 @@
+# M1, U2: daily returns are one unit per session, never scaled for the
+# holiday or the weekend they cross. Same returns as Book D
+# (m1_daily_fill_open_report.yaml), so the same risk figures, though here two
+# of the three returns span 2 and 3 calendar days.
+#
+# Derivation
+# 1. Daily values at XNYS closes (EST UTC-05:00), fill="close" layout:
+#    2024-11-26 16:00 100; 11-27 16:00 102; 11-29 13:00 100.98 (after
+#    Thanksgiving, a half-day); 12-02 16:00 102.9996 (after the weekend).
+# 2. R = [0.02, -0.01, 0.02] (102/100, 100.98/102 = 0.99,
+#    102.9996/100.98 = 1.02); all kept (daily fill="close", M2). U2: each is
+#    one session, unscaled, whatever its clock length.
+# 3. As in Book D: Annualized Volatility sqrt(0.0756) = 0.2749545417; Sharpe
+#    sqrt(84) = 9.1651513899; Downside Volatility sqrt(0.0084)
+#    = 0.0916515139; Sortino sqrt(756) = 27.4954541697.
+rule: [M1, U2]
+kind: performance_report
+inputs:
+  labels: ["2024-11-26T16:00:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-02T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 102.0, 100.98, 102.9996]
+expected:
+  report:
+    Annualized Volatility: 0.2749545416973504
+    Sharpe Ratio: 9.16515138991168
+    Downside Volatility: 0.0916515138991168
+    Sortino Ratio: 27.49545416973504
+    Daily Returns:
+      labels: ["2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00", "2024-12-02T16:00:00-05:00"]
+      values: [0.02, -0.01, 0.02]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

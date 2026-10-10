@@ -1,0 +1,40 @@
+# B3, B2: fill="close" on naive hourly input. The fill is labelled at the first
+# bar's close, session 1 has no open mark, and naive input still gives tz-aware
+# labels on the exchange clock.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-29 half-day 09:30-13:00; then the
+#    weekend; 2024-12-02 09:30-16:00. Bars on a :30 hourly grid, given as naive
+#    wall-clock times with tz="America/New_York". One symbol, A, held.
+# 2. Bars: 11-29 09:30, 10:30, 11:30, 12:30; 12-02 09:30, 10:30.
+# 3. Marks:
+#    - B2 fill="close": V_0 at C_{1,1}, labelled at the first bar's close
+#      11-29 10:30; no open mark in session 1
+#    - 11-29 closes: 11:30, 12:30, 13:00 (short bar at the early close)
+#    - 12-02 open mark at the session open 09:30 (B1.1), then closes 10:30, 11:30
+#    7 marks, 6 returns.
+# 4. A fresh everywhere.
+# 5. Classes: 11-29 11:30, 12:30, 13:00 regular; 12-02 09:30 gap (from the
+#    half-day's 13:00 close, across the weekend: still one gap, B1.4); 10:30,
+#    11:30 regular.
+rule: [B3, B2, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-29T09:30:00", "2024-11-29T10:30:00", "2024-11-29T11:30:00",
+         "2024-11-29T12:30:00", "2024-12-02T09:30:00", "2024-12-02T10:30:00"]
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0, 105.0, 106.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0, 106.0, 107.0]
+  held: {A: true}
+  fill: close
+  tz: America/New_York
+expected:
+  labels: ["2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+           "2024-12-02T11:30:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true, true, true]
+  classes: [regular, regular, regular, gap, regular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

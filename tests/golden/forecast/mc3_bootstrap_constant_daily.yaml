@@ -1,0 +1,38 @@
+# MC3, MC2, MC1: bootstrap on a zero-variance daily history. Daily input has
+# one class and sim_length counts bars (a daily bar is a session), so the
+# paths are known and there is no intraday sim_length warning.
+#
+# History: our fill="open" daily output (XNYS, EST UTC-05:00):
+#   2024-11-25 09:30 (fill) 100, 11-25 16:00 101, 11-26 16:00 102.01,
+#   11-27 16:00 103.0301. Daily by MC1 (one mark per session at its close,
+#   plus the fill).
+#
+# Derivation
+# 1. Returns 101/100 - 1 = 102.01/101 - 1 = 103.0301/102.01 - 1 = 0.01, all
+#    one class (MC1: daily input, one class). Pool {ln 1.01} x 3; n = 3 meets
+#    min_sample = 3.
+# 2. Layout (MC2, as mc2_daily_history.yaml): sim_length = 3 bars: 11-29
+#    13:00 (half-day close; 11-28 is Thanksgiving), 12-02 16:00, 12-03 16:00,
+#    one class "regular" (U1: daily data is all regular).
+# 3. Every draw is ln 1.01 and no daily bar is rescaled (U2), so the path is
+#    1.01^k: 1.0, 1.01, 1.0201, 1.030301.
+# 4. Warnings: none (the sim_length warning is for intraday input only, MC2).
+# Tolerance: relative 1e-12.
+rule: [MC3, MC2, MC1]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T16:00:00-05:00",
+           "2024-11-26T16:00:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.01, 103.0301]
+  sim_length: 3
+  n_sims: 5
+  random_state: 2
+  options: {min_sample: 3}
+expected:
+  shape: [5, 4]
+  labels: ["2024-11-29T13:00:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00"]
+  classes: [regular, regular, regular]
+  path: [1.0, 1.01, 1.0201, 1.030301]
+  warns: []
+tolerance: {abs: 1.0e-12, rel: 1.0e-12}

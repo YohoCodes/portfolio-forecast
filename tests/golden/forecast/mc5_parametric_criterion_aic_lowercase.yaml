@@ -1,0 +1,51 @@
+# MC5: `criterion` is case-insensitive; "aic" selects per class by
+# AIC = -2 log L + 2k.
+#
+# History: the generated book of mc5_parametric_selects_t_and_normal.yaml
+# (800 XNYS sessions from 2021-01-04, 30-minute grid, seed 21): gaps
+# N(-0.01, 0.01^2), n = 799; regular 0.0005 + 0.002 t_3, n = 10,376.
+#
+# Derivation
+# 1. criterion = "aic" is accepted as "AIC" (MC5: case-insensitive).
+# 2. Expected winners (as in the BIC case, from the populations): regular t,
+#    gap normal.
+# 3. Margin check on this seed (scipy fits by hand outside the package, best
+#    of several starts):
+#    - regular: AIC normal -88419.5, t -91778.0, Johnson SU -91758.8: t by 19.2.
+#    - gap: AIC normal -5132.1, t -5130.1, Johnson SU -5128.3: normal by 2.0.
+#      The normal fit is closed-form, and at its maximum t gains no
+#      likelihood over it (df -> infinity, AIC exactly 2 higher) and Johnson
+#      SU at most 0.1, so the normal wins whatever the optimizer.
+# 5. MC5 report, per class: Criterion "AIC"; Parameters named as scipy's
+#    (normal loc, scale; t df, loc, scale); the family's AIC equals
+#    -2 log L + 2k at those parameters on the class's pool (the runner
+#    recomputes it from the generated history, l' = l since rho = 1); and
+#    Candidates holds normal, t and Johnson SU, lowest first, the selected
+#    family's score being the lowest.
+#    The fit's keys are those of parametric_monte_carlo's docstring:
+#    fit[class] has "Distribution" (scipy name), "Parameters" (by name),
+#    "Criterion", the criterion's score under its own name, and
+#    "Candidates" (every candidate's score, lowest first).
+rule: [MC5]
+kind: parametric_monte_carlo
+inputs:
+  generate:
+    kind: sessions
+    calendar: XNYS
+    start: "2021-01-04"
+    sessions: 800
+    grid: 30min
+    seed: 21
+    gap: {mean: -0.01, sd: 0.01}
+    regular: {mean: 0.0005, sd: 0.002, df: 3}
+  sim_length: 1
+  n_sims: 2
+  random_state: 0
+  options: {criterion: aic}
+expected:
+  fit_none: false
+  family: {gap: normal, regular: t}
+  fit_report:
+    gap: {criterion: AIC, candidates: [normal, t, johnsonsu]}
+    regular: {criterion: AIC, candidates: [normal, t, johnsonsu]}
+tolerance: 0  # names and keys; scores within 1e-6 relative of the recomputed criterion

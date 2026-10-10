@@ -1,0 +1,24 @@
+# MC1: our own fill="open" daily output (a 09:30 fill mark, then one
+# mark per session at its close) is daily, including a half-day 13:00 close.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-25 09:30, 11-25 16:00, 11-26 16:00,
+#    11-27 16:00, 11-29 13:00. Thanksgiving 11-28 is closed; 11-29 closes early
+#    at 13:00.
+# 2. Per session: 11-25 has the initial fill mark (09:30) plus its close; 11-26,
+#    11-27 and 11-29 each have one mark, at that session's close (13:00 is the
+#    close of the half-day).
+# 3. MC1: daily iff at most one mark per session at the session close, plus
+#    optionally one initial fill mark. Both hold: daily.
+# 4. A detector reading clock times (16:00 only, or "no 09:30 marks") would get
+#    this wrong; the calendar decides.
+rule: [MC1]
+kind: is_daily
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T16:00:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.0, 103.0]
+expected:
+  value: true
+tolerance: 0  # a boolean

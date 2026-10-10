@@ -1,0 +1,18 @@
+# U3, MC1: in continuous mode an hourly series is not daily, even
+# though it crosses 00:00 UTC (no sessions to collapse it to).
+#
+# Derivation
+# 1. calendar=None. Labels 2024-11-30 22:00, 23:00, 12-01 00:00, 01:00 UTC:
+#    every step 1 hour, so Delta = 1 hour.
+# 2. U3: daily iff Delta = 1 day; 1 hour is not: false.
+rule: [U3, MC1]
+kind: is_daily
+inputs:
+  calendar: null
+  labels: ["2024-11-30T22:00:00+00:00", "2024-11-30T23:00:00+00:00",
+           "2024-12-01T00:00:00+00:00", "2024-12-01T01:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 101.0, 102.0, 103.0]
+expected:
+  value: false
+tolerance: 0  # a boolean

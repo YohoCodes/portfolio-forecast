@@ -1,0 +1,68 @@
+# MC3, MC1, B4.1, B1.6: irregular returns are in neither pool. The history is
+# a BacktestResult, which supplies the classes (MC1); two returns are classed
+# irregular and carry moves (+0.05, +0.03) that no future draw may repeat.
+#
+# History: as mc3_bootstrap_constant_hourly_half_day.yaml (XNYS, EST, hourly
+#   on :30, 2024-11-25 to 11-27, fill="open"), except:
+#   - the 11-25 12:30 bar has l = 0.05 and is irregular (a stale held symbol,
+#     B4.1);
+#   - the 11-26 open mark has l = 0.03 from the 11-25 close and is irregular
+#     (a late first bar, B1.6), not a gap.
+#   Otherwise: full bars m = 0.002, short 15:30-16:00 bars m/2, the 11-27 gap
+#   g = -0.01. Values 100 exp(sum l), 17 significant digits.
+#
+# Derivation
+# 1. Pools (MC3, irregular excluded): gap {g} (n = 1, 11-27 only); regular
+#    pool: 20 returns, 17 full at m and 3 short at m/2.
+#    MC3 over regular returns only: m_hat = (17 m + 3 m/2)/(17 + 3/2) = m;
+#    l' = m for all 20.
+#    min_sample = 1: both classes have n >= 1.
+# 2. If either irregular return entered a pool, a gap or bar draw could be
+#    0.03 or 0.05 and the 20 paths would not all be one path (each would
+#    match with probability at most 1/2 per gap draw, 2^-40 for all 20 paths'
+#    two gaps).
+# 3. Layout and path: the same as mc3_bootstrap_constant_hourly_half_day.yaml
+#    (same calendar position, same forced draws): 13 future marks, path exp of
+#    the cumulative 0, -0.010, -0.008, -0.006, -0.004, -0.003, -0.013, -0.011,
+#    -0.009, -0.007, -0.005, -0.003, -0.001, 0.000.
+# Tolerance: relative 1e-10.
+rule: [MC3, MC1, B4.1, B1.6]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T10:30:00-05:00", "2024-11-25T11:30:00-05:00",
+           "2024-11-25T12:30:00-05:00", "2024-11-25T13:30:00-05:00", "2024-11-25T14:30:00-05:00",
+           "2024-11-25T15:30:00-05:00", "2024-11-25T16:00:00-05:00",
+           "2024-11-26T09:30:00-05:00", "2024-11-26T10:30:00-05:00", "2024-11-26T11:30:00-05:00",
+           "2024-11-26T12:30:00-05:00", "2024-11-26T13:30:00-05:00", "2024-11-26T14:30:00-05:00",
+           "2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T09:30:00-05:00", "2024-11-27T10:30:00-05:00", "2024-11-27T11:30:00-05:00",
+           "2024-11-27T12:30:00-05:00", "2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00",
+           "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.20020013340003, 100.40080106773419, 105.54846021550802, 105.75976837366115,
+           105.97149957102877, 106.18365465453599, 106.28989141871955,
+           109.52690052584657, 109.74617352680824, 109.96588551261033, 110.1860373621011,
+           110.40662995588823, 110.6276641763424, 110.84914090760078, 110.96004549155832,
+           109.85597459171744, 110.07590639939797, 110.29627851085085, 110.51709180756485,
+           110.73834717279342, 110.96004549155835, 111.18218765065318, 111.29342544793266]
+  as_backtest_result: true
+  classes: [regular, regular, irregular, regular, regular, regular, regular,
+            irregular, regular, regular, regular, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  sim_length: 2
+  n_sims: 20
+  random_state: 4
+  options: {min_sample: 1}
+expected:
+  shape: [20, 14]
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  classes: [gap, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  path: [1.0, 0.9900498337491681, 0.9920319148370607, 0.9940179640539353, 0.9960079893439915,
+         0.997004495503373, 0.9870841350202876, 0.9890602787753687, 0.9910403787728836,
+         0.9930244429332351, 0.9950124791926823, 0.997004495503373, 0.999000499833375, 1.0]
+tolerance: {abs: 1.0e-12, rel: 1.0e-10}
