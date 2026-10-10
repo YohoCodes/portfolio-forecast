@@ -1,0 +1,23 @@
+# B6: the boundary. A bar whose close equals now is complete and kept
+# (c_j <= now, not c_j < now).
+#
+# Derivation
+# 1. Same bars as b6_in_progress_bar_dropped: 2024-12-02 09:30, 10:30, 11:30,
+#    12:30 EST on a :30 hourly grid; closes 10:30, 11:30, 12:30, 13:30.
+# 2. now = 2024-12-02 12:30:00 EST exactly.
+#    - 10:30 <= 12:30 keep
+#    - 11:30 <= 12:30 keep
+#    - 12:30 <= 12:30 keep (equality: the bar closed at this instant)
+#    - 13:30 >  12:30 drop
+# 3. A strict c_j < now would give [true, true, false, false].
+rule: [B6]
+kind: completed_mask
+inputs:
+  index: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+          "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  index_tz: America/New_York
+  now: "2024-12-02T12:30:00-05:00"
+expected:
+  mask: [true, true, true, false]
+  warns: []
+tolerance: 0  # booleans, compared exactly

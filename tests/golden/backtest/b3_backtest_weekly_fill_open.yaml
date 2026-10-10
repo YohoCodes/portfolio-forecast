@@ -1,0 +1,32 @@
+# B3, B2: the backtest on weekly bars with fill="open": the fill at the open
+# of the first bar's first session, each value at its bar's last session close.
+#
+# Derivation
+# 1. Weekly bars (naive dates, each week's Monday) 2024-11-18, 11-25, 12-02.
+#    Session spans (XNYS, EST UTC-05:00), as in b3_weekly_fill_open_labels.yaml:
+#    11-18 09:30 to 11-22 16:00; 11-25 09:30 to 11-29 13:00 (Thanksgiving
+#    closed, half-day Friday); 12-02 09:30 to 12-06 16:00.
+# 2. AAA only, br0 = 1000. O 100, 101, 102; C 101, 99, 103.
+# 3. Fill at 11-18 09:30 at O = 100: n = 10. Values at each bar's last close:
+#    11-22 16:00: 1010; 11-29 13:00: 990; 12-06 16:00: 1030.
+# 4. Classes: weekly bars are close to close, one class: regular x 3.
+rule: [B3, B2]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-18", "2024-11-25", "2024-12-02"]
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 102.0]
+    Close:
+      AAA: [101.0, 99.0, 103.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: open
+expected:
+  labels: ["2024-11-18T09:30:00-05:00", "2024-11-22T16:00:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 990.0, 1030.0]
+  classes: [regular, regular, regular]
+  warns: []
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

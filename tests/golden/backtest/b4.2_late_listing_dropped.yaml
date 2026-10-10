@@ -1,0 +1,49 @@
+# B4.2: a symbol with no price at the fill is dropped, the other weights are
+# renormalized, and a warning names it with its first price date.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-12-02 (Mon) to 12-05 (Thu), full
+#    sessions closing 16:00.
+# 2. Daily bars 12-02, 12-03, 12-04, 12-05; weights AAA 0.5, BBB 0.25,
+#    ZZZ 0.25; br0 = 1200; fill="close".
+#    date      12-02 12-03 12-04 12-05
+#    AAA C     100   102   101   104
+#    BBB C      50    51    49    52
+#    ZZZ C     null   20    21    22     (first price 2024-12-03)
+#    (Opens are given but unused with fill="close".)
+# 3. Fill at 12-02's close: ZZZ has no price there, so it is dropped (B4.2),
+#    judged on the fill alone. Remaining weights 0.5 and 0.25 renormalize to
+#    2/3 and 1/3. n_AAA = 1200 (2/3) / 100 = 8; n_BBB = 1200 (1/3) / 50 = 8.
+# 4. Values, V = 8 P_AAA + 8 P_BBB:
+#    - 12-02: 800 + 400 = 1200
+#    - 12-03: 816 + 408 = 1224
+#    - 12-04: 808 + 392 = 1200
+#    - 12-05: 832 + 416 = 1248
+# 5. Classes: AAA and BBB fresh everywhere; ZZZ is not held (dropped), so its
+#    prices do not affect classes: regular x 3.
+# 6. Warning: one, naming ZZZ and its first price date, 2024-12-03.
+rule: [B4.2]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-12-02", "2024-12-03", "2024-12-04", "2024-12-05"]
+  prices:
+    Open:
+      AAA: [99.0, 101.0, 102.0, 101.0]
+      BBB: [49.0, 50.0, 51.0, 49.0]
+      ZZZ: [null, 19.5, 20.0, 21.0]
+    Close:
+      AAA: [100.0, 102.0, 101.0, 104.0]
+      BBB: [50.0, 51.0, 49.0, 52.0]
+      ZZZ: [null, 20.0, 21.0, 22.0]
+  w: {AAA: 0.5, BBB: 0.25, ZZZ: 0.25}
+  br0: 1200
+  fill: close
+expected:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  tz: America/New_York
+  values: [1200.0, 1224.0, 1200.0, 1248.0]
+  classes: [regular, regular, regular]
+  warns:
+    - {match: "ZZZ.*2024-12-03|2024-12-03.*ZZZ"}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

@@ -1,0 +1,26 @@
+# MC1: intraday labels with no inferable open marks raise. One session crossing
+# and no gap: the first mark of 12-02, 10:30, could be an open mark after the
+# session open (missing first bar) or the close of the 09:30-10:30 bar of
+# close-only input, and labels alone cannot tell which.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-29 (half-day) 09:30, 10:30, 11:30,
+#    12:30, 13:00; 2024-12-02 10:30, 11:30, 12:30.
+# 2. 11-29 09:30 starts the series (no return ends there). The only session
+#    crossing ends at 12-02 10:30, which is not at the 09:30 session open, so no
+#    mark is identifiably an open mark: the series is consistent both with open
+#    marks (12-02 10:30 an open mark, return irregular) and with close-only bars
+#    (12-02 10:30 a bar close, B1.5 territory).
+# 3. MC1: "Intraday input with neither classes nor inferable open marks
+#    raises": ValueError. (Several marks per session, so it is intraday, MC1.)
+rule: [MC1]
+kind: classify_returns
+inputs:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 105.0, 106.0]
+expected:
+  raises: ValueError
+tolerance: 0  # no numbers

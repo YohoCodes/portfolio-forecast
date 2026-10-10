@@ -1,0 +1,39 @@
+# MC7: gap_model = "regime" with bootstrap = True: future gaps draw from the
+# (regime, gap) pool. With one regime that pool is every historical gap, so
+# the gap draws have the gap pool's moments.
+#
+# History: the generated book of mc3_bootstrap_class_moments.yaml (400 XNYS
+# sessions from 2023-01-03, hourly grid, seed 11): 399 gaps N(-0.01, 0.01^2);
+# regular bars with mu = 0.002, sigma = 0.002 (MC7 model).
+# Simulation: sim_length = 50 sessions, n_sims = 200: N_g = 10,000 gap draws.
+#
+# Derivation
+# 1. S = 1: every gap mark belongs to the one regime; the (regime, gap) pool
+#    is the 399 gaps. Bootstrap draws from it: mean -> -0.01, var -> 1e-4
+#    (draws from the empirical pool; its sampling error is in the tolerance).
+# 2. Only the gap draws are checked (regular draws under bootstrap = True are
+#    outside this case).
+# Tolerances (as mc3_bootstrap_class_moments.yaml): gap mean
+# 4 sigma_g sqrt(1/399 + 1/10000) = 2.04e-3 -> 2.1e-3; gap var
+# 4 sigma_g^2 sqrt(2/399 + 2/10000) = 2.89e-5 -> 2.9e-5.
+rule: [MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: sessions
+    calendar: XNYS
+    start: "2023-01-03"
+    sessions: 400
+    grid: 1h
+    seed: 11
+    gap: {mean: -0.01, sd: 0.01}
+    regular: {mean: 0.002, sd: 0.002}
+  sim_length: 50
+  n_sims: 200
+  random_state: 15
+  options: {n_regimes: 1, gap_model: regime, bootstrap: true}
+expected:
+  moments:
+    gap: {mean: -0.01, var: 1.0e-4}
+tolerance:
+  gap: {mean: 2.1e-3, var: 2.9e-5}

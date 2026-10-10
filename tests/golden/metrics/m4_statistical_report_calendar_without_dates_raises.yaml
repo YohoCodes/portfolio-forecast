@@ -1,0 +1,18 @@
+# M4: statistical_report's Total Years follows cagr_clock; "calendar" needs
+# dates, and raises ValueError without them.
+#
+# Input: an array of two daily paths (four columns), interval "1 day", no
+# dates, cagr_clock = "calendar".
+#
+# Derivation
+# 1. M4: Y = (t_T - t_0)/365.25 days needs the marks' times; "`calendar`
+#    there requires `dates`, else raises": ValueError.
+rule: [M4]
+kind: statistical_report
+inputs:
+  paths: [[1.0, 1.01, 1.0302, 1.040502], [1.0, 0.98, 0.9898, 0.979902]]
+  interval: "1 day"
+  cagr_clock: calendar
+expected:
+  raises: ValueError
+tolerance: 0  # the call must raise

@@ -1,3 +1,21 @@
+"""PDF reports: typeset `statistical_report` results and their figures with LaTeX.
+
+Flow of `compile_statistical_reports`
+-------------------------------------
+1. `_validate` checks the report dictionary, so a mistake is reported by
+   name rather than as a LaTeX error.
+2. Each report becomes a section: its description, then
+   `_results_section`'s tables (the simulation setup, the returns and risk
+   summaries from `_interval_table`, and the tail risk of the total
+   return), then its figures, saved as vector PDF.
+3. Text is escaped with `_escape` and numbers formatted with `_number`.
+4. LaTeX runs twice in a temporary directory, and only the PDF is copied
+   out.
+
+The summary tables show the mean, the median and the range across paths:
+percentiles across paths under the fitted model, not a confidence
+interval.
+"""
 import datetime as dt
 import math
 import numbers
@@ -11,7 +29,7 @@ from matplotlib.figure import Figure
 
 # How each statistical_report metric is printed: percentages for returns and
 # risk, two decimals for multiples and ratios
-_PERCENT = {"Total Return", "CAGR", "Period Volatility", "Annualized Volatility",
+_PERCENT = {"Total Return", "CAGR", "Gap Volatility", "Bar Volatility", "Annualized Volatility",
             "Downside Volatility", "Max Drawdown", "Probability of Loss",
             "Value at Risk", "Conditional VaR"}
 
@@ -50,30 +68,44 @@ _PREAMBLE = r"""\documentclass[11pt]{article}
 
 
 def _escape(text):
-    """Make plain text safe to typeset: LaTeX special characters print
-    literally, and blank lines separate paragraphs."""
+    """Return plain text made safe to typeset.
+
+    LaTeX special characters print literally, and blank lines separate
+    paragraphs.
+    """
     escaped = _LATEX_SPECIALS_RE.sub(lambda m: _LATEX_SPECIALS[m.group()], str(text))
     return "\n\n".join(p.strip() for p in re.split(r"\n\s*\n", escaped) if p.strip())
 
 
 def _number(value, metric):
-    """Format one metric value for a table, with a true minus sign."""
+    """Return one metric value formatted for a table, with a true minus sign.
+
+    Metrics in `_PERCENT` print as percentages, others with two decimals.
+    NaN (a figure undefined on every path) is a dash, and an infinite value
+    (a Sortino ratio with no down session) the infinity sign.
+    """
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return "---"
+    if isinstance(value, float) and math.isinf(value):
+        return r"$\infty$" if value > 0 else r"$-\infty$"
     text = f"{value:.2%}" if metric in _PERCENT else f"{value:,.2f}"
     text = text.replace("%", r"\%")
     return r"\textminus{}" + text[1:] if text.startswith("-") else text
 
 
 def _slug(title):
-    """A filesystem-safe file name from the report title."""
+    """Return a filesystem-safe file name from the report title: non-alphanumeric runs become underscores."""
     slug = re.sub(r"[^A-Za-z0-9]+", "_", title).strip("_")
     return slug or "Report"
 
 
 def _interval_table(summary, caption, level):
-    """A booktabs table of Mean, Median and the interval for each metric row
-    of a statistical_report summary frame."""
+    """Return a booktabs table of a `statistical_report` summary frame, one row per metric.
+
+    Columns are Mean, Median, and Lower and Upper under the heading "<level>
+    range across paths" (percentiles across paths, not a confidence
+    interval).
+    """
     rows = "\n".join(
         f"{_escape(metric)} & {_number(row['Mean'], metric)} & {_number(row['Median'], metric)} & "
         f"{_number(row['Lower'], metric)} & {_number(row['Upper'], metric)} \\\\"
@@ -84,7 +116,7 @@ def _interval_table(summary, caption, level):
 \caption{{{caption}}}
 \begin{{tabular}}{{lrrrr}}
 \toprule
- & & & \multicolumn{{2}}{{c}}{{{level} interval}} \\
+ & & & \multicolumn{{2}}{{c}}{{{level} range across paths}} \\
 \cmidrule(lr){{4-5}}
 Metric & Mean & Median & Lower & Upper \\
 \midrule
@@ -95,16 +127,32 @@ Metric & Mean & Median & Lower & Upper \\
 
 
 def _results_section(results, name):
-    """Tables for one statistical_report result: the simulation setup, the
-    returns and risk summaries, and tail risk."""
+    """Return the LaTeX tables of one `statistical_report` result, captioned with `name`.
+
+    The tables are the simulation setup, the returns and risk summaries,
+    and the tail risk of the total return. The risk table leaves out Gap
+    and Bar Volatility as the printout does, when the marks have no gap or
+    are not intraday. VaR and CVaR are labelled with
+    the report's confidence, as `statistical_report` computes them at the
+    1 − confidence quantile.
+    """
+    # The setup rows, as in the printed header: paths, total time in calendar
+    # years and days if the paths have marks, horizon, and the range level
     level = rf"{results['Confidence']:.0%}".replace("%", r"\%")
-    setup = [("Simulated paths", f"{results['Paths']:,}"),
-             ("Horizon", f"{results['Periods']:,} periods ({results['Total Years']:.2f} years)")]
-    if results.get("Total Days") is not None:
-        setup.append(("Calendar span", f"{results['Total Days']:,} days"))
-    setup.append(("Confidence level", level))
+    setup = [("Simulated paths", f"{results['Paths']:,}")]
+    if results.get("Total Time (Years)") is not None:
+        setup.append(("Total time", f"{results['Total Time (Years)']:.2f} years ({results['Total Days']} days)"))
+    setup.append(("Horizon", f"{results['Periods']:,} periods"))
+    setup.append(("Range across paths", level))
     setup_rows = "\n".join(f"{label} & {value} \\\\" for label, value in setup)
 
+    # The risk rows, as in the printout: Gap and Bar Volatility only if the
+    # marks have gaps or are intraday (shown if the flags are missing)
+    hidden = [metric for metric, flag in (("Gap Volatility", "Has Gaps"), ("Bar Volatility", "Intraday"))
+              if not results.get(flag, True)]
+    risk = results["Risk"].drop(index=hidden, errors="ignore")
+
+    # The tail-risk rows, VaR and CVaR labelled with the confidence level
     tail = results["Tail Risk"]
     tail_rows = "\n".join([
         f"Probability of loss & {_number(tail['Probability of Loss'], 'Probability of Loss')} \\\\",
@@ -124,7 +172,7 @@ def _results_section(results, name):
 
 {_interval_table(results['Returns'], f'{name}: returns', level)}
 
-{_interval_table(results['Risk'], f'{name}: risk', level)}
+{_interval_table(risk, f'{name}: risk', level)}
 
 \begin{{table}}[H]
 \centering
@@ -138,8 +186,11 @@ def _results_section(results, name):
 
 
 def _validate(spec):
-    """Check the report dictionary's shape, so a mistake is reported by name
-    rather than as a LaTeX error."""
+    """Raise TypeError or ValueError unless `spec` has the report dictionary's shape.
+
+    Checked up front, so a mistake is reported by name rather than as a
+    LaTeX error.
+    """
     if not isinstance(spec, dict):
         raise TypeError(f"expected a report dictionary, got {type(spec).__name__}")
     if not str(spec.get("Title", "")).strip():
@@ -148,6 +199,7 @@ def _validate(spec):
     if not isinstance(reports, dict) or not reports:
         raise ValueError('the report dictionary needs a non-empty "Reports" dictionary')
 
+    # Each report needs statistical_report results, and each figure a Figure and a width in (0, 1]
     for name, report in reports.items():
         results = report.get("Results") if isinstance(report, dict) else None
         if not isinstance(results, dict) or not {"Returns", "Risk", "Tail Risk"} <= results.keys():
@@ -208,10 +260,10 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         ``"Description"``, ``"Figures"`` and ``"Caption"`` may be empty or
         left out. ``"Width"`` is the figure's width as a share of the text
         width, greater than 0 and at most 1 (the default, full width); the
-        figure is centered and keeps its aspect ratio. Text is typeset literally (LaTeX special characters such as
-        ``%``, ``&`` and ``_`` are escaped), and a blank line starts a new
-        paragraph. The figure keys (``"Fig1"``) only name the figures in
-        error messages.
+        figure is centered and keeps its aspect ratio. Text is typeset
+        literally (LaTeX special characters such as ``%``, ``&`` and ``_``
+        are escaped), and a blank line starts a new paragraph. The figure
+        keys (``"Fig1"``) only name the figures in error messages.
     output_dir : str or path-like, default 'Reporting'
         Directory for the PDF, created if missing. A relative path is
         relative to the current working directory, normally the project
@@ -247,9 +299,10 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
     Notes
     -----
     Requires a LaTeX distribution with the booktabs, caption, fancyhdr,
-    float, geometry, hyperref, lmodern and microtype packages, all part of
-    TeX Live, MacTeX and MiKTeX. Figures are embedded as vector PDF, so they
-    stay sharp at any zoom; the Figure objects are not modified or closed.
+    float, geometry, graphicx, hyperref, lmodern, microtype and xcolor
+    packages, all part of TeX Live, MacTeX and MiKTeX. Figures are embedded
+    as vector PDF, so they stay sharp at any zoom; the Figure objects are
+    not modified or closed.
 
     Examples
     --------
@@ -273,6 +326,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
             "or MiKTeX on Windows) and make sure its binaries are on PATH."
         )
 
+    # The PDF's directory and file name, from the title unless given
     title = str(spec["Title"]).strip()
     output_dir = Path(output_dir).resolve()
     pdf_name = filename or f"{_slug(title)}.pdf"
@@ -289,6 +343,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         if table_of_contents:
             body.append(r"\tableofcontents")
 
+        # One section per report: description, result tables, then its figures saved as vector PDF
         n_figure = 0
         for name, report in spec["Reports"].items():
             section = [rf"\section{{{_escape(name)}}}"]
@@ -310,6 +365,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
                 )
             body.append("\n\n".join(section))
 
+        # The full document: preamble, centered title and date, then the body
         today = dt.date.today()
         date = f"{today:%B} {today.day}, {today.year}"
         escaped_title = _escape(title)
@@ -326,7 +382,8 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
         tex = build / "report.tex"
         tex.write_text(document, encoding="utf-8")
 
-        # Twice, so the table of contents and cross-references settle
+        # Twice: the first run writes the table of contents and page
+        # references to auxiliary files, the second typesets them
         for _ in range(2):
             run = subprocess.run(
                 [engine, "-interaction=nonstopmode", "-halt-on-error", tex.name],
@@ -337,6 +394,7 @@ def compile_statistical_reports(spec, output_dir="Reporting", filename=None, eng
                 tail = log.read_text(errors="replace")[-3000:] if log.exists() else run.stdout[-3000:]
                 raise RuntimeError(f"{engine} failed to compile the report:\n{tail}")
 
+        # Only the PDF leaves the temporary directory
         output_dir.mkdir(parents=True, exist_ok=True)
         pdf = output_dir / pdf_name
         shutil.copyfile(build / "report.pdf", pdf)

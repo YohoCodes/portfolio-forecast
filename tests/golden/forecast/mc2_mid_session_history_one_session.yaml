@@ -1,0 +1,28 @@
+# MC2, MC8: history ending mid-session, n = 1. The partial session is
+# the first of the n sessions, so the layout is today's remaining bars only and
+# the horizon ends at C_{d+n-1} = C_d, today's close.
+#
+# Derivation
+# 1. History (XNYS, EST UTC-05:00): 2024-12-02 (session d, 09:30-16:00)
+#    09:30 (fill), then bar closes 10:30, 11:30, 12:30. Grid: hourly bars on
+#    :30, Delta = 1 hour. The history ends at 12:30, mid-session.
+# 2. The bars of session d still to come start 12:30, 13:30, 14:30, 15:30.
+# 3. MC2: they come first, with no gap (same session):
+#    - 13:30, 14:30, 15:30: full bars, regular, tau 1
+#    - 16:00: the short 15:30-16:00 bar, regular, tau 30/60 = 0.5
+# 4. n = 1: the horizon ends at C_{d+1-1} = 12-02 16:00, so the layout is
+#    step 3 alone: 4 marks, no gap.
+rule: [MC2, MC8]
+kind: next_trading_dates
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+           "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5]
+  n: 1
+expected:
+  labels: ["2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  classes: [regular, regular, regular, regular]
+  tau: [1.0, 1.0, 1.0, 0.5]
+tolerance: {abs: 1.0e-12}  # tau; labels and classes exact

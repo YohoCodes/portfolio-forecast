@@ -1,0 +1,38 @@
+# M2: on weekly bars with fill="close" the first return is a full
+# close-to-close bar and is kept. The risk figures match the fill="open"
+# weekly case (m1_weekly_fill_open_report.yaml).
+#
+# Derivation
+# 1. Weekly marks as simulate_buy_and_hold(fill="close") labels them (B3):
+#    each week's last session close. XNYS, EST UTC-05:00:
+#    - 2024-11-22 16:00  101 (fill, as if br0 = 101)
+#    - 2024-11-29 13:00  103.02   week of 11-25: 4 sessions (11-28 closed)
+#    - 2024-12-06 16:00  101.9898 week of 12-02: 5 sessions
+#    - 2024-12-13 16:00  104.029596 week of 12-09: 5 sessions
+# 2. Bar returns 0.02, -0.01, 0.02. The first runs close to close, a full
+#    bar: kept (M2, "except fill="close" on daily and longer bars").
+# 3. As in the fill="open" weekly case: sd = sqrt(0.0003); Annualized
+#    Volatility = sqrt(0.0003 x 52) = 0.1248999600; Sharpe = sqrt(52/3)
+#    = 4.1633319989; Downside Volatility = sqrt(0.0001/3 x 52) = 0.0416333200;
+#    Sortino = sqrt(156) = 12.4899959968.
+# 4. M4 session clock: N = sessions after the fill = 4 + 5 + 5 = 14,
+#    Y = 14/252 = 0.0555555556. Total Return = 104.029596/101 - 1 = 0.029996;
+#    CAGR = 1.029996^(252/14) - 1 = 1.029996^18 - 1 = 0.7023140601.
+rule: [M2, M1, M4]
+kind: performance_report
+inputs:
+  labels: ["2024-11-22T16:00:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-06T16:00:00-05:00", "2024-12-13T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [101.0, 103.02, 101.9898, 104.029596]
+  interval: "1 week"
+expected:
+  report:
+    Total Return: 0.029996
+    CAGR: 0.7023140601386175
+    Total Years: 0.05555555555555555
+    Annualized Volatility: 0.12489995996796796
+    Sharpe Ratio: 4.163331998932265
+    Downside Volatility: 0.041633319989322654
+    Sortino Ratio: 12.489995996796795
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

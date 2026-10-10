@@ -1,0 +1,27 @@
+# MC1: to_session_values accepts a BacktestResult and gives the same
+# result as for its values.
+#
+# Derivation
+# 1. The marks and values of mc1_to_session_values_hourly, wrapped in a
+#    BacktestResult (values, dates = the labels, classes). Classes, by the mark
+#    each return ends at: 11-29 10:30, 11:30, 12:30, 13:00 regular; 12-02 09:30
+#    gap; 12-02 10:30 ... 16:00 (seven marks) regular. 12 classes, 13 marks.
+# 2. As in mc1_to_session_values_hourly: first mark 11-29 09:30 -> 100, then each
+#    session's last mark: 11-29 13:00 -> 103, 12-02 16:00 -> 109.
+rule: [MC1]
+kind: to_session_values
+inputs:
+  as_backtest_result: true
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 105.0, 106.0, 105.0, 107.0, 108.0, 107.5, 109.0]
+  classes: [regular, regular, regular, regular, gap, regular, regular, regular, regular, regular,
+            regular, regular]
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T13:00:00-05:00", "2024-12-02T16:00:00-05:00"]
+  values: [100.0, 103.0, 109.0]
+tolerance: {abs: 1.0e-12}

@@ -1,0 +1,22 @@
+# B2: fill="open" on data without opens raises ValueError naming fill="close".
+#
+# Derivation
+# 1. Data: daily closes only (flat columns, one per symbol: the 0.3.0
+#    "already closes" layout), 11-26, 11-27, 11-29.
+# 2. B2: "fill="open" on data without opens raises ValueError naming
+#    fill="close"". The match accepts either quote style.
+rule: [B2]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-26", "2024-11-27", "2024-11-29"]
+  layout: closes
+  prices:
+    Close:
+      AAA: [102.0, 100.0, 104.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: open
+expected:
+  raises: ValueError
+  match: "fill=[\"']close[\"']"
+tolerance: 0  # no output; the call must raise

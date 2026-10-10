@@ -1,0 +1,36 @@
+# U3, MC2, MC7, MC8: regime_switching_monte_carlo in continuous mode:
+# HMM with regular emissions only (C = 1), future marks t_T + k Delta,
+# sim_length in bars.
+#
+# History (generated, test_golden.generated_history, seed 51): 201 hourly
+# marks, 2024-12-06 00:00 UTC to 12-14 08:00 UTC, 24/7; l from a two-state
+# chain, P = [[0.95, 0.05], [0.05, 0.95]], N(0.001, 0.001^2) and
+# N(-0.001, 0.003^2).
+#
+# Derivation
+# 1. calendar=None: no gaps; the HMM has one class (U3), n_regimes = 2.
+# 2. Layout: 12-14 09:00 ... 13:00 UTC (k = 1..5), regular. Paths 3 x 6,
+#    column 0 = 1.0, fit filled.
+rule: [U3, MC2, MC7, MC8]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: continuous
+    start: "2024-12-06T00:00:00+00:00"
+    bars: 200
+    grid: 1h
+    seed: 51
+    regular:
+      regimes: {P: [[0.95, 0.05], [0.05, 0.95]], means: [0.001, -0.001], sds: [0.001, 0.003]}
+  calendar: null
+  sim_length: 5
+  n_sims: 3
+  random_state: 8
+  options: {n_regimes: 2}
+expected:
+  shape: [3, 6]
+  labels: ["2024-12-14T09:00:00+00:00", "2024-12-14T10:00:00+00:00", "2024-12-14T11:00:00+00:00",
+           "2024-12-14T12:00:00+00:00", "2024-12-14T13:00:00+00:00"]
+  classes: [regular, regular, regular, regular, regular]
+  fit_none: false
+tolerance: 0  # labels, classes and shape only

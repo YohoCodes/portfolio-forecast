@@ -1,0 +1,27 @@
+# MC1: a series with at most one mark per session, not at the close, is
+# neither daily nor intraday: nonparametric_monte_carlo raises ValueError naming
+# to_session_values.
+#
+# Input: XNYS (EST UTC-05:00) marks at 12:00 on 2024-12-02, 12-03, 12-04 and
+#   12-05: one mark per session, none at the 16:00 close, no fill mark.
+#
+# Derivation
+# 1. MC1: daily needs every mark at its session's close (plus an optional fill
+#    mark); 12:00 is not a close. Intraday needs several marks per session;
+#    each session has one. So neither: MC1 raises, pointing to
+#    to_session_values (which accepts it, mc1_to_session_values_midday_relabel).
+rule: [MC1]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T12:00:00-05:00", "2024-12-03T12:00:00-05:00",
+           "2024-12-04T12:00:00-05:00", "2024-12-05T12:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.5, 102.0]
+  sim_length: 3
+  n_sims: 3
+  random_state: 0
+  options: {min_sample: 0}
+expected:
+  raises: ValueError
+  match: 'to_session_values'
+tolerance: 0  # raise only

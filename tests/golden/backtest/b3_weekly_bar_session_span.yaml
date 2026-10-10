@@ -1,0 +1,23 @@
+# B3: each weekly bar maps to its calendar session span
+# {s_first, ..., s_last}: first open, last close and session count.
+#
+# Derivation
+# 1. Input: naive weekly bars labelled by their week's Monday: 2024-11-18,
+#    2024-11-25, 2024-12-02 (seven days apart: weekly bars).
+# 2. Sessions per week on XNYS (EST, UTC-05:00):
+#    - week of 11-18: Mon 18 - Fri 22, no holidays: 5 sessions; first open
+#      11-18 09:30, last close 11-22 16:00.
+#    - week of 11-25: Mon 25, Tue 26, Wed 27, (Thu 28 Thanksgiving closed),
+#      Fri 29 half-day closing 13:00: 4 sessions; first open 11-25 09:30, last
+#      close 11-29 13:00.
+#    - week of 12-02: Mon 2 - Fri 6, no holidays or early closes: 5 sessions;
+#      first open 12-02 09:30, last close 12-06 16:00.
+rule: [B3]
+kind: session_spans
+inputs:
+  index: ["2024-11-18", "2024-11-25", "2024-12-02"]
+expected:
+  first_open: ["2024-11-18T09:30:00-05:00", "2024-11-25T09:30:00-05:00", "2024-12-02T09:30:00-05:00"]
+  last_close: ["2024-11-22T16:00:00-05:00", "2024-11-29T13:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  n_sessions: [5, 4, 5]
+tolerance: 0  # labels and counts, compared exactly

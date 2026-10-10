@@ -1,0 +1,38 @@
+# MC1: to_session_values with a history ending mid-session and `now` before
+# that session's close: the session is still in progress, so it is left out
+# entirely (no value labelled at its future close) and there is no warning.
+#
+# Derivation
+# 1. Hourly marks (XNYS, EST UTC-05:00), fill="open", both sessions normal
+#    (close 16:00):
+#    - 2024-12-02: 09:30 100 (br0), 10:30 100.6, 11:30 101.1, 12:30 100.9,
+#      13:30 101.4, 14:30 101.8, 15:30 101.5, 16:00 102.0. Last mark at the
+#      close.
+#    - 2024-12-03: 09:30 102.3, 10:30 102.8, 11:30 102.5, 12:30 103.1. The
+#      history ends here, with the last mark 12:30 before the 16:00 close.
+# 2. now = 2024-12-03 12:45 EST. The last session's close, 12-03 16:00, is
+#    after now: MC1 leaves that session out (neither its 12:30 mark nor a
+#    relabel at 16:00). 12-02 closed at 16:00, before now, and ends at its
+#    close.
+# 3. Output: the first mark (br0) and 12-02's close: 12-02 09:30 -> 100,
+#    12-02 16:00 -> 102.0. Values are copied, not computed.
+# 4. No warning: the short-session warning applies only to sessions whose
+#    close is at or before now, and 12-02 ends at its close.
+rule: [MC1]
+kind: to_session_values
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.6, 101.1, 100.9, 101.4, 101.8, 101.5, 102.0,
+           102.3, 102.8, 102.5, 103.1]
+  now: "2024-12-03T12:45:00-05:00"
+expected:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  tz: America/New_York
+  values: [100.0, 102.0]
+  warns: []
+tolerance: {abs: 1.0e-12}

@@ -1,0 +1,38 @@
+# M2: daily fill="close" keeps its first return, which is already a full
+# close-to-close session; the risk figures match the fill="open" Book D.
+#
+# Derivation
+# 1. Book D of m1_daily_fill_open_report.yaml as fill="close" would label it:
+#    no 09:30 mark; 12-02 16:00 101 (as if br0 = 101), 12-03 16:00 103.02,
+#    12-04 16:00 101.9898, 12-05 16:00 104.029596.
+# 2. Returns: 0.02, -0.01, 0.02. The first runs from the 12-02 close to the
+#    12-03 close, a full session: kept (M2, "except daily fill="close"").
+#    Daily Returns = [0.02, -0.01, 0.02].
+# 3. Same returns as Book D's risk series, hence the same figures:
+#    Annualized Volatility sqrt(0.0756) = 0.2749545417, Sharpe sqrt(84)
+#    = 9.1651513899, Downside Volatility sqrt(0.0084) = 0.0916515139, Sortino
+#    sqrt(756) = 27.4954541697.
+# 4. Total Return = 104.029596/101 - 1 = 0.029996. CAGR (M4): N = session
+#    closes after the fill = 3 (12-03, 12-04, 12-05; the fill is the 12-02
+#    close itself), Y = 3/252; CAGR = 1.029996^84 - 1 = 10.9725098274.
+#    Total Years = 3/252 = 0.0119047619.
+rule: [M2, M1, M4]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [101.0, 103.02, 101.9898, 104.029596]
+expected:
+  report:
+    Total Return: 0.029996
+    CAGR: 10.972509827384458
+    Total Years: 0.011904761904761904
+    Annualized Volatility: 0.2749545416973504
+    Sharpe Ratio: 9.16515138991168
+    Downside Volatility: 0.0916515138991168
+    Sortino Ratio: 27.49545416973504
+    Daily Returns:
+      labels: ["2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+      values: [0.02, -0.01, 0.02]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

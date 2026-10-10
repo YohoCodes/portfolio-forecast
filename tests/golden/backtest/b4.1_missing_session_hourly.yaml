@@ -1,0 +1,46 @@
+# B4.1: a whole non-holiday session missing from hourly data. The return
+# from the last close before it to the next open mark spans that session's
+# scheduled marks and is irregular, not a gap.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-26 (Tue) and 2024-11-27 (Wed) are
+#    full sessions, 09:30-16:00; 2024-11-28 is Thanksgiving (holiday);
+#    2024-11-29 (Fri) is a half-day, 09:30-13:00. Hourly bars on :30.
+# 2. Data, one symbol A, held: 11-26 bars 13:30, 14:30, 15:30 (15:30-16:00 is
+#    the short last bar); no 11-27 bars at all (a non-holiday session missing);
+#    11-29 bars 09:30, 10:30, 11:30, 12:30 (12:30-13:00 short).
+# 3. Marks (B1.1-B1.4, B2, B3, fill="close"): the fill is the first bar's close,
+#    11-26 14:30; then 15:30, 16:00; 11-29's open mark at its first bar's start,
+#    09:30 (the session open); then 10:30, 11:30, 12:30, 13:00. 8 marks.
+#    fill="close" gives session 1 no open mark (B2).
+# 4. Freshness: A has its own close at every close mark and its own open at the
+#    11-29 open mark: fresh everywhere.
+# 5. Classes:
+#    - 11-26 15:30, 16:00: close to close, regular
+#    - 11-29 09:30: from 11-26 16:00 to the 11-29 open mark. The span contains
+#      every scheduled mark of 11-27 (its open and bar closes), missing for the
+#      only held symbol, and 11-27 is not a holiday: irregular (B4.1), not gap
+#    - 11-29 10:30: first bar, open to close, regular
+#    - 11-29 11:30, 12:30, 13:00: close to close, regular
+rule: [B4.1, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-26T13:30:00-05:00", "2024-11-26T14:30:00-05:00", "2024-11-26T15:30:00-05:00",
+         "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 104.0, 105.0, 106.0, 107.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 105.0, 106.0, 107.0, 108.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-11-26T14:30:00-05:00", "2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true, true, true, true]
+  classes: [regular, regular, irregular, regular, regular, regular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

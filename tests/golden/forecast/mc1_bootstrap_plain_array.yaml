@@ -1,0 +1,29 @@
+# MC1, MC3, MC4: a plain array is one class with no layout: the result's
+# dates and classes are None and sim_length counts steps.
+#
+# Input: the array [100, 102, 104.04, 106.1208] (no labels).
+#
+# Derivation
+# 1. Returns: 102/100 - 1 = 104.04/102 - 1 = 106.1208/104.04 - 1 = 0.02.
+#    One class (MC1: plain arrays, one class), pool {ln 1.02} x 3; n = 3 meets
+#    min_sample = 3.
+# 2. sim_length = 4 steps: 4 marks, 5 columns; no calendar layout, so
+#    SimulationResult.dates and .classes are None.
+# 3. Path (MC4): exp(k ln 1.02) = 1.02^k: 1.0, 1.02, 1.0404, 1.061208,
+#    1.08243216.
+# 4. Warnings: none (not intraday).
+# Tolerance: relative 1e-12.
+rule: [MC1, MC3, MC4]
+kind: nonparametric_monte_carlo
+inputs:
+  array: [100.0, 102.0, 104.04, 106.1208]
+  sim_length: 4
+  n_sims: 3
+  random_state: 3
+  options: {min_sample: 3}
+expected:
+  shape: [3, 5]
+  dates_none: true
+  path: [1.0, 1.02, 1.0404, 1.061208, 1.08243216]
+  warns: []
+tolerance: {abs: 1.0e-12, rel: 1.0e-12}

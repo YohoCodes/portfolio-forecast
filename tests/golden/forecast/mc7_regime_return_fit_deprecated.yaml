@@ -1,0 +1,32 @@
+# MC7: regime_switching_monte_carlo's `return_fit` is deprecated and ignored:
+# DeprecationWarning, and a SimulationResult whose fit is filled.
+#
+# Input: a plain array (generated, seed 31): 3000 returns from a two-state
+# Markov chain, P = [[0.9, 0.1], [0.1, 0.9]], l ~ N(+0.02, 0.002^2) in state 0
+# and N(-0.02, 0.002^2) in state 1.
+#
+# Derivation
+# 1. return_fit=True: DeprecationWarning naming return_fit; the result is a
+#    SimulationResult with fit not None (always filled for
+#    regime).
+# 2. Plain array, n_regimes = 2: dates None, paths 3 x 4 (sim_length = 3).
+rule: [MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: array
+    returns: 3000
+    seed: 31
+    regular:
+      regimes: {P: [[0.9, 0.1], [0.1, 0.9]], means: [0.02, -0.02], sds: [0.002, 0.002]}
+  sim_length: 3
+  n_sims: 3
+  random_state: 0
+  options: {n_regimes: 2, return_fit: true}
+expected:
+  shape: [3, 4]
+  dates_none: true
+  fit_none: false
+  deprecation:
+    - {match: "return_fit"}
+tolerance: 0  # shape and flags only

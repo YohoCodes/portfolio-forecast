@@ -1,0 +1,26 @@
+# B3: hourly bars on an on-the-hour grid (09:30, 10:00, 11:00, ..., 15:00), where
+# the short bar is the first one (09:30-10:00), not the last.
+#
+# Derivation
+# 1. XNYS session on 2024-12-03: 09:30-16:00 America/New_York, EST (UTC-05:00).
+# 2. Bars after the session's first start at 10:00, 11:00, ..., 15:00: one hour
+#    apart, on the hour, so the grid is hourly with phase :00. The 09:30 bar
+#    starts off the grid at the session open.
+# 3. B3: each value at its bar's close, the next grid point after its start:
+#    - 09:30 -> next grid point 10:00 (a 30-minute bar)
+#    - 10:00 -> 11:00, 11:00 -> 12:00, 12:00 -> 13:00, 13:00 -> 14:00,
+#      14:00 -> 15:00
+#    - 15:00 -> 16:00, which is also the session close (a full bar).
+rule: [B3]
+kind: close_times
+inputs:
+  index: ["2024-12-03T09:30:00-05:00", "2024-12-03T10:00:00-05:00", "2024-12-03T11:00:00-05:00",
+          "2024-12-03T12:00:00-05:00", "2024-12-03T13:00:00-05:00", "2024-12-03T14:00:00-05:00",
+          "2024-12-03T15:00:00-05:00"]
+  index_tz: America/New_York
+expected:
+  labels: ["2024-12-03T10:00:00-05:00", "2024-12-03T11:00:00-05:00", "2024-12-03T12:00:00-05:00",
+           "2024-12-03T13:00:00-05:00", "2024-12-03T14:00:00-05:00", "2024-12-03T15:00:00-05:00",
+           "2024-12-03T16:00:00-05:00"]
+  tz: America/New_York
+tolerance: 0  # labels only, compared exactly

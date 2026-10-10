@@ -1,0 +1,33 @@
+# MC1: intraday input with neither classes nor inferable open marks raises
+# (parametric_monte_carlo).
+#
+# Input: XNYS (EST UTC-05:00) hourly bar closes only, 2024-12-02 and 12-03:
+#   10:30, 11:30, 12:30, 13:30, 14:30, 15:30, 16:00 each day; no 09:30 open
+#   marks; no classes given.
+#
+# Derivation
+# 1. Several marks per session: intraday (MC1), not daily.
+# 2. classify_returns needs open marks to place the gaps (MC1); there are
+#    none (mc1_classify_returns_no_open_marks_raises). With no classes given
+#    either, the call raises ValueError; the message is about the missing open
+#    marks or classes.
+rule: [MC1]
+kind: parametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00",
+           "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00", "2024-12-02T15:30:00-05:00",
+           "2024-12-02T16:00:00-05:00",
+           "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00", "2024-12-03T12:30:00-05:00",
+           "2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00", "2024-12-03T15:30:00-05:00",
+           "2024-12-03T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.5, 101.0, 100.8, 101.2, 101.0, 101.5,
+           101.3, 101.8, 102.0, 101.6, 102.2, 102.4, 102.1]
+  sim_length: 1
+  n_sims: 3
+  random_state: 0
+  options: {min_sample: 0}
+expected:
+  raises: ValueError
+  match: '(?i)open|classes'
+tolerance: 0  # raise only

@@ -1,0 +1,39 @@
+# MC7: kappa = 0 is the plain MLE, so simulated regimes persist as in the
+# history: switch rate per step 1 - P_ii = 0.1 (mean run length 10).
+#
+# History: a plain array (generated, test_golden.generated_history, seed 31):
+# 3000 returns from a two-state Markov chain started in state 0,
+#   P = [[0.9, 0.1], [0.1, 0.9]],
+#   state 0: l ~ N(+0.02, 0.002^2),  state 1: l ~ N(-0.02, 0.002^2).
+# The two emissions are 20 standard deviations apart, so the regime of every
+# l, history or simulated, is its sign (P(wrong sign) = P(Z > 10) < 1e-22).
+# On this seed the history switches sign at 9.57% of its 2999 steps and is
+# 49.8% positive.
+#
+# Derivation
+# 1. kappa = 0: P_hat_ij proportional to xi_ij, the MLE; with separable
+#    emissions xi counts the history's transitions, so 1 - P_hat_ii is the
+#    history's switch rate out of state i, population 0.1.
+# 2. Simulated paths (n_sims = 200, sim_length = 100) step the chain once per
+#    mark: 200 x 99 = 19,800 consecutive pairs; the share with a sign change
+#    estimates the switch rate.
+# 3. Tolerance, 4 standard errors: history estimate sqrt(0.09/2999) = 0.00548,
+#    simulation sqrt(0.09/19800) = 0.00213; sqrt(0.00548^2 + 0.00213^2)
+#    = 0.00588; x 4 = 0.0235 -> 0.024. Expected 0.10 +/- 0.024.
+rule: [MC7]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: array
+    returns: 3000
+    seed: 31
+    regular:
+      regimes: {P: [[0.9, 0.1], [0.1, 0.9]], means: [0.02, -0.02], sds: [0.002, 0.002]}
+  sim_length: 100
+  n_sims: 200
+  random_state: 32
+  options: {n_regimes: 2, kappa: 0.0}
+expected:
+  dates_none: true
+  switch_rate: {value: 0.1, tol: 0.024}
+tolerance: 0  # bounds in expected

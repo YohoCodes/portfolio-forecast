@@ -1,0 +1,30 @@
+# B2, B3: fill="close" on the daily bars of b2_fill_open_daily.yaml. br0 sits
+# at the first close; one mark per session, at its close.
+#
+# Derivation
+# 1. Calendar as in b2_fill_open_daily.yaml (11-29 closes at 13:00).
+# 2. Daily bars 11-26, 11-27, 11-29; AAA weight 1; br0 = 1000.
+#    AAA C: 102, 100, 104 (opens 100, 101, 103 are not used).
+# 3. Fill: V(C_1) = 1000 at 11-26 16:00; n = 1000/102.
+# 4. Values: 11-26 16:00: 1000; 11-27 16:00: 1000*100/102 = 980.3921568627451;
+#    11-29 13:00: 1000*104/102 = 1019.6078431372549.
+# 5. Classes: regular, regular.
+rule: [B2, B3]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-26", "2024-11-27", "2024-11-29"]
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 103.0]
+    Close:
+      AAA: [102.0, 100.0, 104.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: close
+expected:
+  labels: ["2024-11-26T16:00:00-05:00", "2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 980.3921568627451, 1019.6078431372549]
+  classes: [regular, regular]
+  warns: []
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

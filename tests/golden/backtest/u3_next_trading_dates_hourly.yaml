@@ -1,0 +1,21 @@
+# U3, MC2, MC8: future marks in continuous mode are t_T + k Delta,
+# k = 1..n, n in bars, all regular with tau 1; weekends are not skipped.
+#
+# Derivation
+# 1. calendar=None. History labels 2024-11-29 (Fri) 21:00, 22:00, 23:00 UTC:
+#    Delta = 1 hour, t_T = 11-29 23:00.
+# 2. n = 3 bars: t_T + 1h, + 2h, + 3h = 11-30 (Sat) 00:00, 01:00, 02:00.
+# 3. U3: every return regular, tau = 1 (no short bars, no gaps).
+rule: [U3, MC2, MC8]
+kind: next_trading_dates
+inputs:
+  calendar: null
+  labels: ["2024-11-29T21:00:00+00:00", "2024-11-29T22:00:00+00:00", "2024-11-29T23:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 101.0, 102.0]
+  n: 3
+expected:
+  labels: ["2024-11-30T00:00:00+00:00", "2024-11-30T01:00:00+00:00", "2024-11-30T02:00:00+00:00"]
+  classes: [regular, regular, regular]
+  tau: [1.0, 1.0, 1.0]
+tolerance: {abs: 1.0e-12}  # tau; labels and classes exact

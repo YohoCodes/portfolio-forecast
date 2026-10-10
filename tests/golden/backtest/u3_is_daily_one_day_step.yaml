@@ -1,0 +1,18 @@
+# U3, MC1: in continuous mode a series is daily iff Delta = 1 day,
+# weekends included.
+#
+# Derivation
+# 1. calendar=None. Labels 00:00 UTC on 2024-11-29 (Fri), 11-30 (Sat), 12-01
+#    (Sun), 12-02 (Mon), 12-03 (Tue): every step 1 day, so Delta = 1 day.
+# 2. U3: "MC1 daily iff Delta = 1 day": true.
+rule: [U3, MC1]
+kind: is_daily
+inputs:
+  calendar: null
+  labels: ["2024-11-29T00:00:00+00:00", "2024-11-30T00:00:00+00:00", "2024-12-01T00:00:00+00:00",
+           "2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 101.0, 102.0, 101.0, 103.0]
+expected:
+  value: true
+tolerance: 0  # a boolean

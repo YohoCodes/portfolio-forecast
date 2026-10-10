@@ -1,0 +1,27 @@
+# M8, U3: in continuous mode a year is bounded at 00:00 UTC on
+# 1 January, whatever the labels' time zone.
+#
+# Derivation
+# 1. calendar=None. Marks every 5 hours, given in America/New_York (EST,
+#    UTC-05:00); in UTC: 2024-12-31 12:00 100, 17:00 101, 22:00 102,
+#    2025-01-01 03:00 103, 08:00 102, 13:00 99.96. No mark falls on 00:00 UTC.
+# 2. Years by UTC (M8, U3): 2024 holds the marks up to 2024-12-31 22:00 UTC;
+#    2025 starts with 2025-01-01 03:00 UTC, which is 2024-12-31 22:00 in New
+#    York (a local-clock year would put it in 2024).
+#    - 2024: from br0, R = 102/100 - 1 = 0.02; partial (starts 12-31)
+#    - 2025: R = 99.96/102 - 1 = -0.02; partial (ends 01-01)
+rule: [M8, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-12-31T07:00:00-05:00", "2024-12-31T12:00:00-05:00", "2024-12-31T17:00:00-05:00",
+           "2024-12-31T22:00:00-05:00", "2025-01-01T03:00:00-05:00", "2025-01-01T08:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 103.0, 102.0, 99.96]
+  cagr_clock: calendar
+expected:
+  yearly:
+    years: [2024, 2025]
+    return: [0.02, -0.02]
+    is_full: [false, false]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

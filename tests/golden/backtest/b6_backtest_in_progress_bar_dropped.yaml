@@ -1,0 +1,36 @@
+# B6: with now injected, the bar still in progress is dropped from the
+# backtest without a warning; a bar closing exactly at now is kept.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-12-02 09:30-16:00; hourly bars 09:30,
+#    10:30, 11:30, 12:30 closing 10:30, 11:30, 12:30, 13:30.
+# 2. now = 2024-12-02 12:30 EST. B6: kept iff c_j <= now: the 11:30 bar
+#    (c = 12:30) is kept; the 12:30 bar (c = 13:30) is dropped.
+# 3. AAA only, br0 = 1000, fill="open"; O 100, 101, 102, 103; C 101, 102, 103,
+#    104. n = 10.
+# 4. Marks and values: 09:30 1000; 10:30 1010; 11:30 1020; 12:30 1030. The
+#    dropped bar's 1040 does not appear.
+# 5. Classes: regular x 3. No warning (B6: "dropped without a warning").
+rule: [B6]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+         "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 102.0, 103.0]
+    Close:
+      AAA: [101.0, 102.0, 103.0, 104.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: open
+  now: "2024-12-02T12:30:00-05:00"
+expected:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+           "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1010.0, 1020.0, 1030.0]
+  classes: [regular, regular, regular]
+  warns: []
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

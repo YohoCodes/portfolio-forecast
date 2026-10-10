@@ -1,0 +1,54 @@
+# M1, M2, M4, M5, M6, M7 on daily values with fill="open": the first return
+# (open to close of session 1) is excluded from the risk figures, which use
+# the remaining session returns annualized with 252; Gap and Bar Volatility
+# are NaN on daily data.
+#
+# Book D. XNYS, EST UTC-05:00; sessions 2024-12-02 (Mon) to 12-05 (Thu),
+# 09:30-16:00. Values as simulate_buy_and_hold(fill="open") labels them: the
+# fill at 12-02 09:30, then each session close.
+#   12-02 09:30 100 (fill), 12-02 16:00 101, 12-03 16:00 103.02,
+#   12-04 16:00 101.9898, 12-05 16:00 104.029596
+#
+# Derivation
+# 1. Returns between marks: 0.01, 0.02, -0.01, 0.02 (101/100, 103.02/101 =
+#    1.02, 101.9898/103.02 = 0.99, 104.029596/101.9898 = 1.02).
+# 2. M2: the first return runs from the 09:30 fill to the 12-02 close, a
+#    partial session: excluded. Daily Returns R = [0.02, -0.01, 0.02] at the
+#    12-03, 12-04, 12-05 closes.
+# 3. mean 0.01; deviations 0.01, -0.02, 0.01; sample variance
+#    (0.0001 + 0.0004 + 0.0001)/2 = 0.0003; sd = 0.0173205081.
+#    Annualized Volatility = sqrt(0.0003 x 252) = sqrt(0.0756) = 0.2749545417.
+# 4. Sharpe (r_f = 0) = 0.01/0.0173205081 x sqrt(252) = sqrt(252/3) = sqrt(84)
+#    = 9.1651513899.
+# 5. Sortino (M7): DD = sqrt(0.01^2/3) = 0.0057735027; Downside Volatility
+#    = DD sqrt(252) = sqrt(0.0084) = 0.0916515139; Sortino = 0.01 sqrt(252)/DD
+#    = sqrt(756) = 27.4954541697.
+# 6. Total Return = 104.029596/100 - 1 = 0.04029596.
+#    CAGR (M4, session clock): N = 4 session closes after the 09:30 fill
+#    (12-02 counts), Y = 4/252; CAGR = 1.04029596^63 - 1 = 11.0471814052.
+#    Total Years = 4/252 = 0.0158730159.
+# 7. Max Drawdown (M6): peak 103.02, then 101.9898: 1 - 0.99 = 0.01.
+# 8. Gap Volatility, Bar Volatility: NaN on daily data (M5).
+rule: [M1, M2, M4, M5, M6, M7]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 103.02, 101.9898, 104.029596]
+expected:
+  report:
+    Total Return: 0.04029596
+    CAGR: 11.047181405247457
+    Total Years: 0.015873015873015872
+    Annualized Volatility: 0.2749545416973504
+    Sharpe Ratio: 9.16515138991168
+    Downside Volatility: 0.0916515138991168
+    Sortino Ratio: 27.49545416973504
+    Max Drawdown: 0.01
+    Gap Volatility: .nan
+    Bar Volatility: .nan
+    Daily Returns:
+      labels: ["2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+      values: [0.02, -0.01, 0.02]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

@@ -1,0 +1,32 @@
+# M4: statistical_report's Total Years and CAGR on cagr_clock="calendar":
+# Y = (t_T - t_0)/365.25 days from the dates, one per column of the paths.
+#
+# Input: an array of two daily paths, interval "1 day", with dates (one per
+# column, the starting value included, as 0.3.0): 2024-12-02, 12-03, 12-04,
+# 12-05, each at the 16:00 XNYS close (EST UTC-05:00, no clock change).
+#   P1: 1, 1.01, 1.0302, 1.040502;  P2: 1, 0.98, 0.9898, 0.979902
+#
+# Derivation
+# 1. t_T - t_0 = 12-05 16:00 - 12-02 16:00 = 3 days exactly; Total Years
+#    Y = 3/365.25 = 0.0082135524.
+# 2. CAGR = V_T^(1/Y) - 1 = V_T^121.75 - 1:
+#    P1 exp(121.75 ln 1.040502) - 1 = exp(4.8338754) - 1 = 124.6971492142;
+#    P2 exp(121.75 ln 0.979902) - 1 = exp(-2.4718552) - 1 = -0.9155719194.
+#    (On the session clock, N = 3 and Y = 3/252 would give 27.08 for P1:
+#    m7_statistical_report_infinite_sortino_path.)
+# Tolerance: relative 1e-9.
+rule: [M4]
+kind: statistical_report
+inputs:
+  paths: [[1.0, 1.01, 1.0302, 1.040502], [1.0, 0.98, 0.9898, 0.979902]]
+  interval: "1 day"
+  dates: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+          "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  dates_tz: America/New_York
+  cagr_clock: calendar
+expected:
+  report:
+    Total Years: 0.008213552361396304
+  per_path:
+    CAGR: [124.69714921416332, -0.9155719194433912]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

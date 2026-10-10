@@ -4,12 +4,15 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pytest
 
+from portfolio_forecast import SimulationResult
 from portfolio_forecast.performance import statistical_report
 from portfolio_forecast.plotting import plot_simulated_paths
 from portfolio_forecast.reporting import compile_statistical_reports
-from portfolio_forecast.reporting.pdf import _escape, _number, _slug
+from portfolio_forecast.reporting.pdf import _escape, _number, _results_section, _slug
+from portfolio_forecast.utils import next_trading_dates
 
 needs_latex = pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
 
@@ -64,6 +67,61 @@ class TestFormatting:
         assert _number(-0.05, "Max Drawdown") == r"\textminus{}5.00\%"
         assert _number(1.2345, "Sharpe Ratio") == "1.23"
         assert _number(float("nan"), "CAGR") == "---"
+        # M7: an infinite Sortino ratio prints as the infinity sign
+        assert _number(float("inf"), "Sortino Ratio") == r"$\infty$"
+        assert _number(0.0123, "Bar Volatility") == r"1.23\%"
+
+
+class TestReportTables:
+    def test_range_wording(self, sims):
+        # The Lower/Upper columns are a range across paths, not an interval;
+        # daily paths have neither gaps nor intraday bars, so no class rows
+        tex = _results_section(statistical_report(sims, "1 day"), "Report")
+        assert "Gap Volatility" not in tex and "Bar Volatility" not in tex
+        assert "Period Volatility" not in tex
+        assert r"95\% range across paths" in tex
+        assert "interval" not in tex and "Confidence level" not in tex
+
+    def test_risk_rows_follow_the_classes(self):
+        # Hourly exchange marks have gaps and bars; hourly continuous marks
+        # only bars; daily marks neither, as in the printout
+        rng = np.random.default_rng(1)
+
+        def risk_rows(dates, **kwargs):
+            paths = np.cumprod(1 + rng.normal(0, 0.01, (20, len(dates))), axis=1)
+            tex = _results_section(statistical_report(paths, dates=dates, **kwargs), "Report")
+            return [m for m in ("Gap Volatility", "Bar Volatility") if f"\n{m} &" in tex]
+
+        hourly = pd.DatetimeIndex([pd.Timestamp(f"{d} {t}", tz="America/New_York")
+                                   for d in pd.bdate_range("2025-06-02", "2025-06-13").strftime("%Y-%m-%d")
+                                   for t in ["09:30"] + [f"{h}:00" for h in range(10, 17)]])
+        assert risk_rows(hourly, interval="1h") == ["Gap Volatility", "Bar Volatility"]
+        continuous = pd.date_range("2025-06-01", periods=24 * 10 + 1, freq="h", tz="UTC")
+        assert risk_rows(continuous, calendar=None, cagr_clock="calendar") == ["Bar Volatility"]
+        daily = pd.bdate_range("2025-06-02", periods=30)
+        assert risk_rows(daily, interval="1 day") == []
+
+    def test_risk_rows_shown_when_the_class_flags_are_missing(self, sims):
+        # A results dict without the flags keeps both rows, as before
+        results = statistical_report(sims, "1 day")
+        del results["Has Gaps"], results["Intraday"]
+        tex = _results_section(results, "Report")
+        assert "Gap Volatility" in tex and "Bar Volatility" in tex
+
+    def test_setup_rows_show_calendar_years(self, sims):
+        # With marks: total time in calendar years and days, then the period
+        # count. 2025-06-02 to 2025-06-23 is 21 days, 21 / 365.25 = 0.06 years
+        dates = pd.DatetimeIndex(["2025-06-02", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06",
+                                  "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13",
+                                  "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-20", "2025-06-23"])
+        tex = _results_section(statistical_report(sims[:, :15], "1 day", dates=dates), "Report")
+        labels = ("Simulated", "Total time", "Horizon", "Calendar")
+        rows = [line for line in tex.splitlines() if line.startswith(labels)]
+        assert rows == [r"Simulated paths & 50 \\", r"Total time & 0.06 years (21 days) \\",
+                        r"Horizon & 14 periods \\"]
+        # Without marks there is no calendar time: only the period count
+        tex = _results_section(statistical_report(sims, "1 day"), "Report")
+        assert "Total time" not in tex and " days" not in tex and r"Horizon & 20 periods \\" in tex
 
     def test_slug(self):
         assert _slug("AAPL: 100-Day Outlook (95%)") == "AAPL_100_Day_Outlook_95"
@@ -131,7 +189,7 @@ class TestCompile:
         spec["Title"] = "Returns & Risk: 95% of $100_000 {#1} ~^\\"
         spec["Introduction"] = ""
         spec["Reports"]["Report 1"]["Figures"]["Fig1"]["Caption"] = ""
-        spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "5 mins")}
+        spec["Reports"]["Report 2 & more"] = {"Results": statistical_report(sims, "1 week")}
         pdf = compile_statistical_reports(spec, output_dir=tmp_path)
         assert pdf.read_bytes().startswith(b"%PDF")
 
@@ -164,6 +222,22 @@ class TestCompile:
         pdf = compile_statistical_reports(spec, output_dir=tmp_path)
         assert rf"\includegraphics[width={latex}\linewidth]" in latex_source[-1]
         assert pdf.read_bytes().startswith(b"%PDF")
+
+    def test_intraday_simulation_with_an_infinite_sortino(self, spec, tmp_path, latex_source):
+        # A SimulationResult on an hourly layout, one path rising throughout
+        # (M7: Sortino +inf, typeset as the infinity sign)
+        history = pd.DatetimeIndex([pd.Timestamp(f"2025-06-02 {t}", tz="America/New_York")
+                                    for t in ["09:30"] + [f"{h}:00" for h in range(10, 17)]])
+        layout = next_trading_dates(history, 3)
+        rng = np.random.default_rng(4)
+        paths = np.vstack([np.cumprod(np.r_[1.0, np.full(len(layout.dates), 1.001)]),
+                           np.cumprod(np.r_[1.0, 1 + rng.normal(0, 0.01, len(layout.dates))])])
+        with pytest.warns(UserWarning, match="infinite on 1 of 2"):
+            results = statistical_report(SimulationResult(paths, layout.dates, layout.classes, None))
+        spec["Reports"]["Report 1"]["Results"] = results
+        pdf = compile_statistical_reports(spec, output_dir=tmp_path)
+        assert pdf.read_bytes().startswith(b"%PDF")
+        assert r"$\infty$" in latex_source[-1] and "Gap Volatility" in latex_source[-1]
 
     def test_latex_failure_reports_the_log_and_writes_nothing(self, spec, tmp_path):
         # pdflatex has no glyph for an emoji

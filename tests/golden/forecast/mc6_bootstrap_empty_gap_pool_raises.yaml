@@ -1,0 +1,29 @@
+# MC6: a class that cannot be sampled (n = 0) always raises, even with
+# min_sample = 0.
+#
+# History (XNYS, EST UTC-05:00; hourly on :30), fill="open", one session:
+#   2024-12-02 09:30 (fill) 100, 10:30 101, 11:30 100.5, 12:30 101, 13:30 102,
+#   14:30 101.5, 15:30 102, 16:00 102.5. Classes inferred: seven regular
+#   returns, no gap (session 1 has no gap, B2).
+#
+# Derivation
+# 1. The gap pool is empty (n = 0). sim_length = 1 from a close: the future
+#    session 12-03 opens with a gap mark, which must draw from the gap pool.
+# 2. MC6: n = 0 cannot be sampled, so ValueError regardless of
+#    min_sample = 0; the message names the gap class.
+rule: [MC6]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.5, 101.0, 102.0, 101.5, 102.0, 102.5]
+  sim_length: 1
+  n_sims: 3
+  random_state: 0
+  options: {min_sample: 0}
+expected:
+  raises: ValueError
+  match: '(?i)\bgap'
+tolerance: 0  # raise only

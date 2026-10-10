@@ -1,0 +1,33 @@
+# M1: continuous mode on daily input uses its own returns, annualized
+# with 365.
+#
+# Derivation
+# 1. calendar=None. Marks 00:00 UTC on 2024-11-30 (Sat), 12-01 (Sun), 12-02,
+#    12-03: values 100, 102, 100.98, 102.9996. Delta = 1 day: daily (U3).
+# 2. Returns 0.02, -0.01, 0.02 (102/100, 100.98/102 = 0.99,
+#    102.9996/100.98 = 1.02). Each runs between consecutive 00:00 UTC
+#    boundaries, a full UTC day, so none is a partial first day (U3): all
+#    three are the risk series.
+# 3. sd = sqrt(0.0003); Annualized Volatility = sqrt(0.0003 x 365)
+#    = sqrt(0.1095) = 0.3309078422. Sharpe (r_f = 0) = 0.01/sqrt(0.0003)
+#    x sqrt(365) = sqrt(365/3) = 11.0302614052. DD = sqrt(0.01^2/3); Downside
+#    Volatility = DD sqrt(365) = 0.1103026141; Sortino = sqrt(3 x 365)
+#    = 33.0907842155.
+rule: [M1, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-11-30T00:00:00+00:00", "2024-12-01T00:00:00+00:00",
+           "2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 102.0, 100.98, 102.9996]
+  cagr_clock: calendar
+expected:
+  report:
+    Annualized Volatility: 0.3309078421554859
+    Sharpe Ratio: 11.030261405182864
+    Downside Volatility: 0.11030261405182865
+    Sortino Ratio: 33.090784215548595
+    Daily Returns:
+      values: [0.02, -0.01, 0.02]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

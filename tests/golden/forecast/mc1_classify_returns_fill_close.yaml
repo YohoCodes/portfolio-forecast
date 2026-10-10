@@ -1,0 +1,24 @@
+# MC1: classify_returns on fill="close" output, whose first mark is a bar close
+# (session 1 has no open mark, B2).
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-29 (half-day) 10:30, 11:30, 12:30,
+#    13:00; 2024-12-02 09:30, 10:30. 6 marks, 5 returns.
+# 2. 11-29 10:30 starts the series (the fill at C_{1,1}); no return ends there,
+#    so it is never classed, even though it is the session's first mark.
+# 3. Classes:
+#    - ending 11-29 11:30, 12:30, 13:00: regular
+#    - ending 12-02 09:30: open mark at the session open: gap
+#    - ending 12-02 10:30: regular
+rule: [MC1]
+kind: classify_returns
+inputs:
+  labels: ["2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+           "2024-11-29T13:00:00-05:00", "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0]
+expected:
+  labels: ["2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  classes: [regular, regular, regular, gap, regular]
+tolerance: 0  # labels and classes, compared exactly

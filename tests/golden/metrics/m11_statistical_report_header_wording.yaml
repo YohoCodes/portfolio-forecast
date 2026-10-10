@@ -1,0 +1,40 @@
+# M11: Lower/Upper are percentiles across paths, not a confidence interval.
+# The printed headers and the docstring say "95% range across paths"; the
+# keys Mean, Median, Lower, Upper are unchanged.
+#
+# SimulationResult (by hand, fit None): three daily paths from the 2024-12-02
+# close to the XNYS closes of 12-03, 12-04, 12-05, all regular:
+#   P2: 1, 1.02, 0.9996, 1.019592;  P3: 1, 0.98, 0.9898, 0.979902;
+#   P4: 1, 1.01, 0.9999, 1.009899   (R = 0.01, -0.01, 0.01).
+# display=True prints the report.
+#
+# Derivation
+# 1. M11: the printed headers say "95% range across paths" (confidence
+#    0.95); 0.3.0's "95% interval" header is gone. The docstring uses the same
+#    words.
+# 2. Keys unchanged: Total Return's summary row has Mean, Median, Lower,
+#    Upper. Values [0.019592, -0.020098, 0.009899], sorted -0.020098,
+#    0.009899, 0.019592: Mean 0.009393/3 = 0.003131; Median 0.009899; Lower
+#    -0.020098 + 0.05 (0.029997) = -0.01859815; Upper 0.009899 + 0.95
+#    (0.009693) = 0.01910735.
+# 3. No warnings: every path has a down session and none is ruined.
+# Tolerance: relative 1e-9.
+rule: [M11]
+kind: statistical_report
+inputs:
+  simulation:
+    paths: [[1.0, 1.02, 0.9996, 1.019592],
+            [1.0, 0.98, 0.9898, 0.979902],
+            [1.0, 1.01, 0.9999, 1.009899]]
+    dates: ["2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+    dates_tz: America/New_York
+    classes: [regular, regular, regular]
+  display: true
+expected:
+  printed: ["95% range across paths"]
+  not_printed: ["95% interval"]
+  docstring: ["95% range across paths"]
+  summary:
+    Total Return: {Mean: 0.003131, Median: 0.009899, Lower: -0.01859815, Upper: 0.01910735}
+  warns: []
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

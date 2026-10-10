@@ -1,0 +1,58 @@
+# U3, M1, M2, M3, M5: statistical_report in continuous mode
+# (calendar=None) on daily bars: each path's own returns, annualized with
+# 365, every bar return kept (Delta >= 1 d), r_f/365 per day, Gap and Bar
+# Volatility NaN (daily).
+#
+# SimulationResult (by hand, fit None): two paths from 2024-12-06 00:00 UTC
+# (column 0) to 00:00 UTC on 12-07 (Saturday), 12-08, 12-09; regular.
+#   P1: 1, 1.01, 1.0302, 1.019898     R = [0.01, 0.02, -0.01]
+#   P2: 1, 0.99, 1.0098, 0.999702     R = [-0.01, 0.02, -0.01]
+# risk_free_rate = 0.0365, so r_f/365 = 0.0001 per day (M3 analog, U3).
+# cagr_clock = "calendar" (the only clock in continuous mode, U3).
+#
+# Derivation
+# 1. Delta = 1 day: daily (U3), own returns x 365 (M1); M2: Delta >= 1 d
+#    keeps every bar return, so all three are the risk series.
+# 2. P1: mean R 0.02/3, sd sqrt(0.00046667/2) = 0.0152752523;
+#    Annualized Volatility = sd sqrt(365) = 0.2918332857.
+#    e = R - 0.0001 = [0.0099, 0.0199, -0.0101], mean 0.0065666667;
+#    Sharpe = 0.0065666667/0.0152752523 x sqrt(365) = 8.2130224702.
+#    DD = sqrt(0.0101^2/3) = 0.0058312377: Downside Volatility
+#    = DD sqrt(365) = 0.1114056402; Sortino = 0.0065666667 sqrt(365)/DD
+#    = 21.5144702656.
+# 3. P2: mean R 0, sd sqrt(0.0006/2) = 0.0173205081: Annualized Volatility
+#    0.3309078422. e = [-0.0101, 0.0199, -0.0101], mean -0.0001;
+#    Sharpe = -0.0001/0.0173205081 x sqrt(365) = -0.1103026141.
+#    DD = sqrt(2 x 0.0101^2/3) = 0.0082466559: Downside Volatility
+#    0.1575513673; Sortino = -0.0001 sqrt(365)/DD = -0.2316704744.
+# 4. Total Return: P1 0.019898, P2 -0.000298. Max Drawdown (every mark):
+#    P1 1 - 1.019898/1.0302 = 0.01; P2 1 - 0.99/1 = 0.01 (and later
+#    1 - 0.999702/1.0098 = 0.01).
+# 5. M5 (U3): Gap Volatility NaN in continuous mode; Bar Volatility NaN on
+#    daily data (as m5_continuous_daily_bar_volatility_nan).
+# 6. No warnings (each path has down days; more than two UTC boundaries).
+# Tolerance: relative 1e-9.
+rule: [U3, M1, M2, M3, M5]
+kind: statistical_report
+inputs:
+  calendar: null
+  cagr_clock: calendar
+  risk_free_rate: 0.0365
+  simulation:
+    dates: ["2024-12-07T00:00:00+00:00", "2024-12-08T00:00:00+00:00", "2024-12-09T00:00:00+00:00"]
+    dates_tz: UTC
+    classes: [regular, regular, regular]
+    paths: [[1.0, 1.01, 1.0302, 1.019898],
+            [1.0, 0.99, 1.0098, 0.999702]]
+expected:
+  per_path:
+    Total Return: [0.019898, -0.000298]
+    Annualized Volatility: [0.29183328574147743, 0.3309078421554862]
+    Sharpe Ratio: [8.213022470153, -0.11030261405182788]
+    Downside Volatility: [0.11140564019234701, 0.15755136728487432]
+    Sortino Ratio: [21.514470265554696, -0.2316704743920299]
+    Max Drawdown: [0.01, 0.01]
+    Gap Volatility: [.nan, .nan]
+    Bar Volatility: [.nan, .nan]
+  warns: []
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

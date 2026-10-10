@@ -1,0 +1,81 @@
+# MC3, MC2, MC8, MC4: bootstrap on a zero-variance hourly history ending
+# at a close, simulated across Thanksgiving, a half-day and a weekend. Every
+# draw is forced, so every path is one known path.
+#
+# History (XNYS, EST UTC-05:00; hourly grid on :30, Delta = 1 h), fill="open":
+#   2024-11-25, 11-26, 11-27, each 09:30 (open mark; the first is the fill),
+#   then closes 10:30, 11:30, 12:30, 13:30, 14:30, 15:30 and 16:00. The
+#   15:30-16:00 bar is short: rho = tau/Delta = 1/2.
+#   Log returns (l = ln(1 + r)): every full bar m = 0.002, every short bar
+#   rho m = 0.001 (pure drift), every gap g = -0.01. Values 100 exp(sum l),
+#   written to 17 significant digits.
+#   Classes are inferred (MC1, classify_returns): the 09:30 marks of 11-26 and
+#   11-27 end gaps (2 gaps); the other 21 returns are regular.
+#
+# Derivation
+# 1. Pools (MC3): gap pool {g, g}; regular pool of 21 returns, 18 full (rho 1)
+#    and 3 short (rho 1/2).
+#    MC3: m_hat = sum l / sum rho = (18 m + 3 m/2)/(18 + 3/2) = m = 0.002.
+#    Normalized history l' = m_hat + (l - rho m_hat)/sqrt(rho):
+#    full bars m + (m - m)/1 = m; short bars m + (m/2 - m/2)/sqrt(1/2) = m.
+#    So the regular pool is {m} x 21 and the gap pool {g} x 2: every draw is
+#    forced whatever the seed.
+# 2. Layout (MC2, MC8; same as next_trading_dates, see
+#    mc2_hourly_across_holiday_half_day_weekend.yaml): sim_length = 2 counts
+#    sessions on intraday history. 11-28 is a holiday; 11-29 is a half-day
+#    (09:30-13:00); then the weekend; then 12-02.
+#    - 11-29: 09:30 gap; 10:30, 11:30, 12:30 regular (rho 1); 13:00 regular,
+#      the short 12:30-13:00 bar (rho 1/2)
+#    - 12-02: 09:30 gap; 10:30 ... 15:30 regular (six, rho 1); 16:00 regular
+#      (rho 1/2)
+#    13 future marks, so paths have 14 columns.
+# 3. Future log returns (MC3 forward map l = rho m_hat + sqrt(rho)(l' - m_hat)):
+#    gap g = -0.01; full bar 1 x m + 1 x (m - m) = m = 0.002; short bar
+#    m/2 + sqrt(1/2)(m - m) = m/2 = 0.001 (drift scales with rho, MC3).
+# 4. Paths (MC4): V_t = exp(sum_{j<=t} l_j), column 0 = 1.0. Cumulative l:
+#    0, -0.010, -0.008, -0.006, -0.004, -0.003 (11-29 13:00),
+#    -0.013 (12-02 09:30), -0.011, -0.009, -0.007, -0.005, -0.003, -0.001,
+#    0.000 (12-02 16:00). exp of each is the expected path.
+# 5. Warnings (MC2): intraday input gets exactly one UserWarning, about
+#    sim_length now counting sessions; nothing else warns.
+# Tolerance: relative 1e-10 (inputs at 17 significant digits; l recovered
+# from value ratios to about 1e-16, summed over 13 marks).
+rule: [MC3, MC2, MC4, MC8, MC1]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T10:30:00-05:00", "2024-11-25T11:30:00-05:00",
+           "2024-11-25T12:30:00-05:00", "2024-11-25T13:30:00-05:00", "2024-11-25T14:30:00-05:00",
+           "2024-11-25T15:30:00-05:00", "2024-11-25T16:00:00-05:00",
+           "2024-11-26T09:30:00-05:00", "2024-11-26T10:30:00-05:00", "2024-11-26T11:30:00-05:00",
+           "2024-11-26T12:30:00-05:00", "2024-11-26T13:30:00-05:00", "2024-11-26T14:30:00-05:00",
+           "2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T09:30:00-05:00", "2024-11-27T10:30:00-05:00", "2024-11-27T11:30:00-05:00",
+           "2024-11-27T12:30:00-05:00", "2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00",
+           "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.20020013340003, 100.40080106773419, 100.6018036054065, 100.80320855042736,
+           101.00501670841682, 101.2072288866078, 101.30848673598094,
+           100.30045045033772, 100.50125208594012, 100.70245572668487, 100.9040621773868,
+           101.10607224447199, 101.30848673598095, 101.51130646157193, 101.61286854060953,
+           100.60180360540653, 100.80320855042739, 101.00501670841685, 101.20722888660782,
+           101.40984589384928, 101.61286854060953, 101.81629763897942, 101.91816486174085]
+  sim_length: 2
+  n_sims: 4
+  random_state: 0
+  options: {min_sample: 2}
+expected:
+  shape: [4, 14]
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  classes: [gap, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  fit_none: true
+  path: [1.0, 0.9900498337491681, 0.9920319148370607, 0.9940179640539353, 0.9960079893439915,
+         0.997004495503373, 0.9870841350202876, 0.9890602787753687, 0.9910403787728836,
+         0.9930244429332351, 0.9950124791926823, 0.997004495503373, 0.999000499833375, 1.0]
+  warns:
+    - {match: "sim_length"}
+tolerance: {abs: 1.0e-12, rel: 1.0e-10}

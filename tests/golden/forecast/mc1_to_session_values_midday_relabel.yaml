@@ -1,0 +1,28 @@
+# MC1: to_session_values accepts one mark per session at 12:00 and
+# relabels each session's last value at that session's close.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 12:00 on 2024-11-25, 11-26, 11-27 and 11-29
+#    (Thanksgiving 11-28 closed; 11-29 a half-day closing 13:00, so 12:00 is
+#    inside it). One mark per session, none at its close (16:00, or 13:00 on
+#    11-29), and the first is not a fill mark followed by its session's close.
+# 2. Each session's last mark is its only mark. MC1: one value per session at
+#    its close, so each value moves to its session's close, unchanged:
+#    11-25 16:00 -> 100, 11-26 16:00 -> 101, 11-27 16:00 -> 102,
+#    11-29 13:00 (half-day close) -> 101.5.
+# 3. The first mark (br0) is session 1's only mark, so it is that session's
+#    last value: kept once, at 11-25 16:00, not duplicated at 12:00.
+# 4. Values are copied, not computed.
+rule: [MC1]
+kind: to_session_values
+inputs:
+  labels: ["2024-11-25T12:00:00-05:00", "2024-11-26T12:00:00-05:00",
+           "2024-11-27T12:00:00-05:00", "2024-11-29T12:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5]
+expected:
+  labels: ["2024-11-25T16:00:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5]
+tolerance: {abs: 1.0e-12}

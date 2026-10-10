@@ -1,0 +1,95 @@
+# M1, M2, M4, M5, M6, M7 on an hourly book of three sessions, fill="open":
+# risk figures on full session returns (R_1 excluded), session-clock CAGR,
+# per-class volatility with short bars scaled in logs, and a drawdown whose
+# trough is an open mark.
+#
+# Book I (values, as a BacktestResult with its classes). XNYS, EST UTC-05:00.
+#   S1 2024-11-29 (half-day, 09:30-13:00):
+#     09:30 100 (fill), 10:30 101, 11:30 101, 12:30 101, 13:00 100
+#   S2 2024-12-02 (09:30-16:00):
+#     09:30 95 (open mark), 10:30 98, 11:30 98, 12:30 98, 13:30 98, 14:30 98,
+#     15:30 98, 16:00 102
+#   S3 2024-12-03 (09:30-16:00):
+#     09:30 103 (open mark), 10:30 ... 15:30 103 (six marks), 16:00 100.98
+#   Classes: S1 regular x 4; S2 gap, regular x 7; S3 gap, regular x 7.
+#   Hourly grid (Delta = 1 h); the 12:30-13:00 bar of S1 and the 15:30-16:00
+#   bars of S2 and S3 are short, tau = 30 min, tau/Delta = 1/2.
+#
+# Derivation
+# 1. Session returns (M1): R_d = V(C_d)/V(C_{d-1}) - 1 with session closes
+#    C_1 = 100 (11-29 13:00), C_2 = 102, C_3 = 100.98.
+#    - R_1 runs from the 09:30 fill to C_1: partial, excluded (M2)
+#    - R_2 = 102/100 - 1 = 0.02;  R_3 = 100.98/102 - 1 = -0.01
+#    "Daily Returns" = [0.02, -0.01] at 12-02 16:00 and 12-03 16:00.
+# 2. Volatility (M1, annualized with 252; sample sd, ddof = 1, as 0.3.0):
+#    mean 0.005; sd = sqrt((0.015^2 + 0.015^2)/1) = 0.015 sqrt(2)
+#    = 0.0212132034; x sqrt(252): sqrt(0.00045 * 252) = sqrt(0.1134)
+#    = 0.3367491648.
+# 3. Sharpe (M3 with r_f = 0; 0.3.0's mean excess / sd x sqrt(252)):
+#    0.005 / 0.0212132034 x sqrt(252) = sqrt(252)/(3 sqrt 2) = sqrt(14)
+#    = 3.7416573868.
+# 4. Sortino (M7): e = [0.02, -0.01]; DD = sqrt((0 + 0.01^2)/2) = 0.0070710678
+#    (all n = 2 sessions in the denominator). Downside Volatility
+#    = DD sqrt(252) = sqrt(0.0126) = 0.1122497216; Sortino = 0.005 sqrt(252)/DD
+#    = sqrt(126) = 11.2249721603.
+# 5. Total Return = 100.98/100 - 1 = 0.0098.
+#    CAGR (M4, session clock): N = session closes after the fill = 3 (the
+#    partial S1 counts whole), Y = 3/252 = 0.0119047619;
+#    CAGR = 1.0098^(252/3) - 1 = 1.0098^84 - 1 = 1.2686671063.
+#    Total Years = Y = 0.0119047619.
+# 6. Max Drawdown (M6, every mark): the running peak is 101 (S1 10:30); the
+#    S2 open mark, 95, is the trough: 1 - 95/101 = 6/101 = 0.0594059406. Later
+#    the peak 103 falls to 100.98, only 1 - 100.98/103 = 0.0196. On session
+#    closes alone the drawdown would be 1 - 100.98/102 = 0.01; the open mark
+#    is what makes it 6/101.
+# 7. Gap Volatility (M5): gap returns g_2 = 95/100 - 1 = -0.05 and
+#    g_3 = 103/102 - 1 = 0.0098039216; sd of two numbers = |g_3 - g_2|/sqrt(2)
+#    = 0.0598039216/1.4142135624 = 0.0422877585.
+# 8. Bar Volatility (M5, U2): the 18 regular returns, short bars scaled
+#    r' = exp(l sqrt(Delta/tau)) - 1 = (1 + r)^sqrt(2) - 1:
+#    - S1: 101/100 - 1 = 0.01; 0; 0; short 100/101: a = (100/101)^sqrt2 - 1
+#      = -0.0139733465
+#    - S2: 98/95 - 1 = 3/95 = 0.0315789474; five 0; short 102/98:
+#      b = (102/98)^sqrt2 - 1 = 0.0582071273
+#    - S3: 103/103 - 1 = 0; five 0; short 100.98/103:
+#      c = (100.98/103)^sqrt2 - 1 = -0.0276219757
+#    Sum = 0.0581907525, mean = 0.0032328196; sum of squares
+#    = 0.0001 + a^2 + (3/95)^2 + b^2 + c^2 = 0.0054435275;
+#    sd = sqrt((0.0054435275 - 18 x 0.0032328196^2)/17) = 0.0175824233.
+# Tolerance: relative 1e-9 (irrational results).
+rule: [M1, M2, M4, M5, M6, M7, U2]
+kind: performance_report
+inputs:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00", "2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00",
+           "2024-12-03T15:30:00-05:00", "2024-12-03T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 101.0, 101.0, 100.0,
+           95.0, 98.0, 98.0, 98.0, 98.0, 98.0, 98.0, 102.0,
+           103.0, 103.0, 103.0, 103.0, 103.0, 103.0, 103.0, 100.98]
+  as_backtest_result: true
+  classes: [regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  interval: "1 hour"
+expected:
+  report:
+    Total Return: 0.0098
+    CAGR: 1.2686671062761703
+    Total Years: 0.011904761904761904
+    Annualized Volatility: 0.3367491648096547
+    Sharpe Ratio: 3.7416573867739413
+    Downside Volatility: 0.11224972160321824
+    Sortino Ratio: 11.224972160321824
+    Max Drawdown: 0.0594059405940594
+    Gap Volatility: 0.0422877584827249
+    Bar Volatility: 0.01758242326710701
+    Daily Returns:
+      labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00"]
+      values: [0.02, -0.01]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

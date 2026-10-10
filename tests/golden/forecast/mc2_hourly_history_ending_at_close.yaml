@@ -1,0 +1,30 @@
+# MC2, MC8: future layout after an hourly history that ends at a session close.
+# n = 1 counts one session: its gap (open mark), then its bars.
+#
+# Derivation
+# 1. History (XNYS, EST UTC-05:00): 2024-12-02 09:30 (fill), then bar closes
+#    10:30, 11:30, 12:30, 13:30, 14:30, 15:30, 16:00. Grid: hourly bars on :30,
+#    Delta = 1 hour; the 15:30 bar is the short last bar (30 minutes).
+# 2. The history ends at 12-02 16:00, the session close. The next session is
+#    2024-12-03 (Tuesday), 09:30-16:00.
+# 3. Layout for that session (MC2: gap, then bars; MC8: open marks included):
+#    - 09:30 open mark, class gap, tau = 1 (a gap is one unit, U2)
+#    - 10:30, 11:30, 12:30, 13:30, 14:30, 15:30: full bars, regular, tau = 1
+#    - 16:00: the 15:30-16:00 bar, regular, tau = 30 min / 60 min = 0.5
+#    8 marks.
+rule: [MC2, MC8]
+kind: next_trading_dates
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5, 103.0, 104.0, 103.5, 105.0]
+  n: 1
+expected:
+  labels: ["2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00", "2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00",
+           "2024-12-03T15:30:00-05:00", "2024-12-03T16:00:00-05:00"]
+  classes: [gap, regular, regular, regular, regular, regular, regular, regular]
+  tau: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5]
+tolerance: {abs: 1.0e-12}  # tau; labels and classes exact

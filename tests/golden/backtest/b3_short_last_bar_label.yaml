@@ -1,0 +1,21 @@
+# B3: the short last bar of a normal day (15:30-16:00) is labelled at its
+# actual end, the session close.
+#
+# Derivation
+# 1. XNYS session on 2024-12-02 (Monday): 09:30-16:00 America/New_York, EST
+#    (UTC-05:00).
+# 2. Input bars start on a :30 hourly grid: 13:30, 14:30, 15:30. Bar size 1 hour.
+# 3. B3: each value at its bar's close; "the bar's actual end for a short last bar".
+#    - 13:30 -> 14:30
+#    - 14:30 -> 15:30
+#    - 15:30 -> 15:30 + 1h = 16:30 is after the 16:00 close, so this bar is
+#      15:30-16:00 (half a grid step) and is labelled 16:00.
+rule: [B3]
+kind: close_times
+inputs:
+  index: ["2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00", "2024-12-02T15:30:00-05:00"]
+  index_tz: America/New_York
+expected:
+  labels: ["2024-12-02T14:30:00-05:00", "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00"]
+  tz: America/New_York
+tolerance: 0  # labels only, compared exactly

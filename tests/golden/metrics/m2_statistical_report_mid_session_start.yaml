@@ -1,0 +1,86 @@
+# M2, M1, M4, M5, M6: statistical_report on intraday paths that start
+# mid-session (MC2 layout). The partial first session is left out of the
+# risk figures (M2) but counts whole on the session clock (M4); Gap and Bar
+# Volatility follow M5 per path, the short bars scaled in logs.
+#
+# SimulationResult (by hand, fit None). The history ended at 2024-12-03 12:30
+# (XNYS, EST UTC-05:00; hourly grid on :30, Delta = 1 h); column 0 = 1.0 is
+# that mark. Future marks (the MC2 layout for n = 3, laid out as in
+# mc2_mid_session_history_two_sessions.yaml one day later):
+#   12-03: 13:30, 14:30, 15:30 regular; 16:00 regular (short, rho 1/2)
+#   12-04: 09:30 gap; 10:30 ... 15:30 regular; 16:00 regular (short)
+#   12-05: 09:30 gap; 10:30 ... 15:30 regular; 16:00 regular (short)
+# Paths (20 marks after column 0):
+#   P1: 12-03 1.05 x 4 | 12-04 09:30 1.029, 10:30-15:30 1.029, 16:00 1.071 |
+#       12-05 09:30 1.071, 10:30-15:30 1.06029, 16:00 1.06029
+#   P2: 12-03 0.97 x 4 | 12-04 09:30 0.9797, 10:30-15:30 0.9797, 16:00 0.9797 |
+#       12-05 09:30 0.9797, 10:30-15:30 0.9650045, 16:00 0.9650045
+#
+# Derivation
+# 1. Session returns (M1): R_d = V(C_d)/V(C_{d-1}) - 1. R_1 runs from the
+#    12:30 start to C_{12-03}: partial, excluded (M2). Full sessions:
+#    P1 R_2 = 1.071/1.05 - 1 = 0.02, R_3 = 1.06029/1.071 - 1 = -0.01;
+#    P2 R_2 = 0.9797/0.97 - 1 = 0.01, R_3 = 0.9650045/0.9797 - 1 = -0.015.
+#    (Including P1's partial +5% would make its R = [0.05, 0.02, -0.01].)
+# 2. Volatility, Sharpe, Sortino (252, r_f = 0, DD over n = 2):
+#    P1 as m1_intraday_three_session_report: vol sqrt(0.1134) = 0.3367491648,
+#       Sharpe sqrt(14) = 3.7416573868, Downside Volatility sqrt(0.0126)
+#       = 0.1122497216, Sortino sqrt(126) = 11.2249721603.
+#    P2 mean -0.0025, sd 0.025/sqrt 2 = 0.0176776695: vol 0.2806243040,
+#       Sharpe -0.0025/0.0176776695 x sqrt(252) = -2.2449944321;
+#       DD = sqrt(0.015^2/2) = 0.0106066017: Downside Volatility 0.1683745824,
+#       Sortino -0.0025 sqrt(252)/DD = -3.7416573868.
+# 3. M4 session clock: N = 3 (the partial 12-03 counts whole, M4), Total
+#    Years 3/252; Total Return P1 0.06029, P2 -0.0349955; CAGR = V_T^84 - 1:
+#    P1 135.6695914175, P2 -0.9498276506.
+# 4. M6 every mark, column 0 included: P1 peak 1.05, trough 1.029: 0.02 (later
+#    1 - 1.06029/1.071 = 0.01); P2 peak 1.0, trough 0.9650045: 0.0349955.
+# 5. M5 Gap Volatility (gap class, sd of g): P1 g = [-0.02, 0]: 0.02/sqrt 2
+#    = 0.0141421356; P2 g = [0.01, 0]: 0.0070710678.
+# 6. M5 Bar Volatility: 18 regular returns per path, short bars
+#    r' = (1 + r)^sqrt(2) - 1 (rho = 1/2):
+#    P1 nonzero: 0.05 (12-03 13:30), b = (1.071/1.029)^sqrt 2 - 1
+#       = 0.0582071273 (12-04 16:00, short), -0.01 (12-05 10:30); sum
+#       0.0982071273, mean 0.0054559515, sum of squares 0.0059880697;
+#       sd = sqrt((0.0059880697 - 18 x 0.0054559515^2)/17) = 0.0179086840.
+#    P2 nonzero: -0.03, -0.015 (no short bar moves): mean -0.0025, sd
+#       sqrt((0.001125 - 18 x 0.0025^2)/17) = 0.0077174363.
+# 7. No warnings.
+# Tolerance: relative 1e-9.
+rule: [M2, M1, M4, M5, M6]
+kind: statistical_report
+inputs:
+  simulation:
+    dates: ["2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00", "2024-12-03T15:30:00-05:00",
+            "2024-12-03T16:00:00-05:00",
+            "2024-12-04T09:30:00-05:00", "2024-12-04T10:30:00-05:00", "2024-12-04T11:30:00-05:00",
+            "2024-12-04T12:30:00-05:00", "2024-12-04T13:30:00-05:00", "2024-12-04T14:30:00-05:00",
+            "2024-12-04T15:30:00-05:00", "2024-12-04T16:00:00-05:00",
+            "2024-12-05T09:30:00-05:00", "2024-12-05T10:30:00-05:00", "2024-12-05T11:30:00-05:00",
+            "2024-12-05T12:30:00-05:00", "2024-12-05T13:30:00-05:00", "2024-12-05T14:30:00-05:00",
+            "2024-12-05T15:30:00-05:00", "2024-12-05T16:00:00-05:00"]
+    dates_tz: America/New_York
+    classes: [regular, regular, regular, regular,
+              gap, regular, regular, regular, regular, regular, regular, regular,
+              gap, regular, regular, regular, regular, regular, regular, regular]
+    paths: [[1.0, 1.05, 1.05, 1.05, 1.05,
+             1.029, 1.029, 1.029, 1.029, 1.029, 1.029, 1.029, 1.071,
+             1.071, 1.06029, 1.06029, 1.06029, 1.06029, 1.06029, 1.06029, 1.06029],
+            [1.0, 0.97, 0.97, 0.97, 0.97,
+             0.9797, 0.9797, 0.9797, 0.9797, 0.9797, 0.9797, 0.9797, 0.9797,
+             0.9797, 0.9650045, 0.9650045, 0.9650045, 0.9650045, 0.9650045, 0.9650045, 0.9650045]]
+expected:
+  per_path:
+    Total Return: [0.06029, -0.0349955]
+    CAGR: [135.66959141752076, -0.9498276506147092]
+    Annualized Volatility: [0.33674916480965505, 0.2806243040080459]
+    Sharpe Ratio: [3.7416573867739413, -2.244994432064365]
+    Downside Volatility: [0.11224972160321835, 0.16837458240482753]
+    Sortino Ratio: [11.224972160321824, -3.7416573867739413]
+    Max Drawdown: [0.02, 0.0349955]
+    Gap Volatility: [0.014142135623731041, 0.007071067811865481]
+    Bar Volatility: [0.017908683966852215, 0.007717436331412904]
+  report:
+    Total Years: 0.011904761904761904
+  warns: []
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

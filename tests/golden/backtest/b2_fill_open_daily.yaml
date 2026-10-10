@@ -1,0 +1,34 @@
+# B2, B3: fill="open" on daily bars: one initial open mark, then close to
+# close; later opens are not used.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-26, 11-27 full sessions,
+#    09:30-16:00; 11-28 Thanksgiving; 11-29 half-day, closing 13:00.
+# 2. Daily bars (midnight dates) 11-26, 11-27, 11-29; AAA weight 1; br0 = 1000.
+#    AAA O: 100, 101, 103; C: 102, 100, 104.
+# 3. Fill: V(O_1) = 1000 at 11-26's open, n = 1000/100 = 10, labelled at the
+#    session open 11-26 09:30 (B3).
+# 4. Then each session's close (B1 daily, B3): 11-26 16:00: 10*102 = 1020;
+#    11-27 16:00: 10*100 = 1000; 11-29 13:00 (half-day close): 10*104 = 1040.
+#    The 101 and 103 opens enter no mark.
+# 5. Classes: daily returns, all fresh: regular, regular, regular.
+rule: [B2, B3]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-26", "2024-11-27", "2024-11-29"]
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 103.0]
+    Close:
+      AAA: [102.0, 100.0, 104.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: open
+expected:
+  labels: ["2024-11-26T09:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1020.0, 1000.0, 1040.0]
+  classes: [regular, regular, regular]
+  warns: []
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

@@ -1,0 +1,45 @@
+# U3, MC2, MC3, MC8: bootstrap in continuous mode (calendar=None).
+# One pool, rho = 1, future marks t_T + k Delta through a weekend night (no
+# sessions), sim_length in bars; the return spanning a missing grid point is
+# irregular and stays out of the pool.
+#
+# History (UTC, 24/7, hourly grid, Delta = 1 h): t_k = 2024-12-06 20:00 + k h
+#   for k = 0..12 (to 12-07 08:00, a Saturday), except k = 6 (12-07 02:00),
+#   missing from the data. V(t_k) = 100 exp(0.001 k): 12 marks, 11 returns.
+#
+# Derivation
+# 1. U3: every return is regular with tau = 1, except the one spanning the
+#    missing 02:00 point (01:00 -> 03:00), which is irregular (l = 0.002).
+#    1/11 = 9.1% irregular: not above 10%, so no U3 warning is due.
+# 2. MC3 in continuous mode (U3): one pool, no rescaling: the 10 regular
+#    returns, all l = 0.001; min_sample = 10 is met. Had the irregular return
+#    entered the pool, draws would be 0.001 or 0.002 and the 20 paths would
+#    differ.
+# 3. Layout (MC2/MC8 analog, U3): t_T + k Delta, n = sim_length = 4 bars:
+#    12-07 09:00, 10:00, 11:00, 12:00 UTC, all regular, on a Saturday (no
+#    calendar).
+# 4. Path: exp(0.001 k), k = 0..4.
+# Tolerance: relative 1e-10.
+rule: [U3, MC2, MC3, MC8]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-12-06T20:00:00+00:00", "2024-12-06T21:00:00+00:00", "2024-12-06T22:00:00+00:00",
+           "2024-12-06T23:00:00+00:00", "2024-12-07T00:00:00+00:00", "2024-12-07T01:00:00+00:00",
+           "2024-12-07T03:00:00+00:00", "2024-12-07T04:00:00+00:00", "2024-12-07T05:00:00+00:00",
+           "2024-12-07T06:00:00+00:00", "2024-12-07T07:00:00+00:00", "2024-12-07T08:00:00+00:00"]
+  values: [100.0, 100.10005001667083, 100.20020013340003, 100.3004504503377, 100.40080106773419,
+           100.5012520859401, 100.70245572668486, 100.80320855042734, 100.90406217738679,
+           101.00501670841679, 101.10607224447195, 101.20722888660778]
+  calendar: null
+  sim_length: 4
+  n_sims: 20
+  random_state: 5
+  options: {min_sample: 10}
+expected:
+  shape: [20, 5]
+  labels: ["2024-12-07T09:00:00+00:00", "2024-12-07T10:00:00+00:00",
+           "2024-12-07T11:00:00+00:00", "2024-12-07T12:00:00+00:00"]
+  classes: [regular, regular, regular, regular]
+  fit_none: true
+  path: [1.0, 1.0010005001667084, 1.0020020013340003, 1.003004504503377, 1.004008010677342]
+tolerance: {abs: 1.0e-12, rel: 1.0e-10}

@@ -1,0 +1,14 @@
+# M12: fewer than two marks: performance_report raises ValueError.
+#
+# Derivation
+# 1. One value, 100, at 2024-12-02 16:00 EST.
+# 2. M12: "Fewer than two marks: performance_report ... raise ValueError."
+rule: [M12]
+kind: performance_report
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0]
+expected:
+  raises: ValueError
+tolerance: 0  # no output; the call must raise

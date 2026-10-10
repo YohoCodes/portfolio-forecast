@@ -1,0 +1,65 @@
+# M1, U3: continuous-mode report. Risk figures use calendar-day
+# returns between the last marks at or before each 00:00 UTC, annualized with
+# 365, the partial first UTC day excluded, r_f/365; calendar clock only; Gap
+# Volatility NaN; Bar Volatility over every regular return.
+#
+# Derivation
+# 1. calendar=None. Marks every 5 hours from 2024-12-01 02:00 to 2024-12-04
+#    00:00 UTC (15 marks, Delta = 5 h, none missing):
+#    12-01 02:00 98, 07:00 99, 12:00 98, 17:00 99, 22:00 100,
+#    12-02 03:00 101, 08:00 102, 13:00 101, 18:00 102, 23:00 103,
+#    12-03 04:00 102, 09:00 101, 14:00 102, 19:00 101, 12-04 00:00 101.97.
+# 2. UTC day boundaries inside the series: 12-02, 12-03, 12-04 00:00. D_t (the
+#    last mark at or before each): 12-01 22:00 (100), 12-02 23:00 (103),
+#    12-04 00:00 (101.97). R = [103/100 - 1, 101.97/103 - 1] = [0.03, -0.01].
+#    The partial first day (02:00 to 22:00 on 12-01) is excluded (U3, M2).
+#    Daily Returns values [0.03, -0.01] (labels not pinned: the spec fixes the
+#    values, not whether they sit at D_t or at the boundary).
+# 3. Annualized Volatility = sd(R) sqrt(365): sd = 0.04/sqrt(2) = 0.0282842712;
+#    sqrt(0.0008 x 365) = sqrt(0.292) = 0.5403702434.
+# 4. risk_free_rate 0.0365: r_f/365 = 0.0001 (U3, M3). e = [0.0299, -0.0101],
+#    ebar = 0.0099. Sharpe = 0.0099/0.0282842712 x sqrt(365) = 6.6870817626.
+#    DD = sqrt(0.0101^2/2) = 0.0071417785; Downside Volatility = DD sqrt(365)
+#    = 0.1364434865; Sortino = 0.0099 sqrt(365)/DD = 26.4834921292.
+# 5. CAGR, calendar clock (cagr_clock="calendar"; "session" raises in this
+#    mode): t_T - t_0 = 2 days 22 hours = 2.9166667 days, Y = 2.9166667/365.25
+#    = 0.0079853981. Total Return = 101.97/98 - 1 = 0.0405102041;
+#    CAGR = 1.0405102041^(1/Y) - 1 = 143.4557963151.
+# 6. Max Drawdown (every mark): peak 103 (12-02 23:00), trough 101 after it:
+#    1 - 101/103 = 2/103 = 0.0194174757 (the earlier 99 -> 98 is 0.0101).
+# 7. Gap Volatility NaN (no gaps, U3). Bar Volatility: sd of the 14 returns
+#    between consecutive marks, all regular, tau = 1 (no scaling):
+#    0.0102040816, -0.0101010101, 0.0102040816, 0.0101010101, 0.01,
+#    0.0099009901, -0.0098039216, 0.0099009901, 0.0098039216, -0.0097087379,
+#    -0.0098039216, 0.0099009901, -0.0098039216, 0.0096039604;
+#    sum 0.0403985130, mean 0.0028856081, sum of squares 0.0013773593,
+#    sd = sqrt((0.0013773593 - 14 x 0.0028856081^2)/13) = 0.0098480184.
+rule: [M1, U3, M2, M3, M4, M5, M6]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-12-01T02:00:00+00:00", "2024-12-01T07:00:00+00:00", "2024-12-01T12:00:00+00:00",
+           "2024-12-01T17:00:00+00:00", "2024-12-01T22:00:00+00:00", "2024-12-02T03:00:00+00:00",
+           "2024-12-02T08:00:00+00:00", "2024-12-02T13:00:00+00:00", "2024-12-02T18:00:00+00:00",
+           "2024-12-02T23:00:00+00:00", "2024-12-03T04:00:00+00:00", "2024-12-03T09:00:00+00:00",
+           "2024-12-03T14:00:00+00:00", "2024-12-03T19:00:00+00:00", "2024-12-04T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [98.0, 99.0, 98.0, 99.0, 100.0, 101.0, 102.0, 101.0, 102.0, 103.0,
+           102.0, 101.0, 102.0, 101.0, 101.97]
+  risk_free_rate: 0.0365
+  cagr_clock: calendar
+expected:
+  report:
+    Total Return: 0.04051020408163275
+    CAGR: 143.4557963151413
+    Total Years: 0.007985398129135296
+    Annualized Volatility: 0.5403702434442518
+    Sharpe Ratio: 6.687081762622617
+    Downside Volatility: 0.1364434864696737
+    Sortino Ratio: 26.48349212919848
+    Max Drawdown: 0.019417475728155338
+    Gap Volatility: .nan
+    Bar Volatility: 0.009848018436501878
+    Daily Returns:
+      values: [0.03, -0.01]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

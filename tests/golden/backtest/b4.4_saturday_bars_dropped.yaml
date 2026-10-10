@@ -1,0 +1,38 @@
+# B4.4: intraday bars on a non-session day (a Saturday) are dropped
+# before marks are built, with one warning giving the count.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-29 (Fri) half-day 09:30-13:00;
+#    2024-11-30 (Sat) and 12-01 (Sun) are not sessions; 2024-12-02 (Mon) full
+#    session 09:30-16:00. Hourly bars on :30.
+# 2. Data, A held: 11-29 bars 11:30, 12:30 (short, to 13:00); 11-30 bars 10:30,
+#    11:30 (on a non-session day); 12-02 bars 09:30, 10:30.
+# 3. B4.4: both Saturday bars are dropped; one UserWarning with the count, 2.
+# 4. Marks (fill="close"): 11-29 12:30 (fill), 13:00; 12-02 09:30 (open mark),
+#    10:30, 11:30. 5 marks; nothing on 11-30.
+# 5. Freshness: fresh everywhere.
+# 6. Classes: 11-29 13:00 regular; 12-02 09:30 gap (from the Friday close; the
+#    weekend has no scheduled marks); 10:30, 11:30 regular.
+rule: [B4.4, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00",
+         "2024-11-30T10:30:00-05:00", "2024-11-30T11:30:00-05:00",
+         "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0, 104.0, 105.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00", "2024-12-02T09:30:00-05:00",
+           "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true]
+  classes: [regular, gap, regular, regular]
+  warns:
+    - {match: "outside|session|extended|dropp", count: 2}
+tolerance: 0  # labels, flags and classes, compared exactly

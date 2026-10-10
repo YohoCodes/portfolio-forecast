@@ -1,0 +1,21 @@
+# B4.4: a daily bar dated on a non-session day raises; only intraday
+# bars are dropped.
+#
+# Derivation
+# 1. Calendar: XNYS has no session on 2024-11-28 (Thanksgiving); 11-26, 11-27
+#    and 11-29 are sessions.
+# 2. Data: daily bars (midnight dates) 11-26, 11-27, 11-28, 11-29 for A, held.
+# 3. B4.4: "Daily bars dated on a non-session day raise": ValueError.
+rule: [B4.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-26", "2024-11-27", "2024-11-28", "2024-11-29"]
+  opens:
+    A: [100.0, 101.0, 102.0, 103.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 104.0]
+  held: {A: true}
+  fill: close
+expected:
+  raises: ValueError
+tolerance: 0  # no output; the call must raise

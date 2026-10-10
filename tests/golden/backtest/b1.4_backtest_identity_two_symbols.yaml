@@ -1,0 +1,72 @@
+# B1.1-B1.4, B2, U1: a two-symbol hourly backtest over three sessions with
+# fill="close". Point-in-time values at every mark, an open mark per session
+# after the first, gap and bar classes, and the B1 identity on the full
+# session in the middle.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-27 full session 09:30-16:00;
+#    11-28 Thanksgiving; 2024-11-29 half-day 09:30-13:00; 2024-12-02 09:30-16:00.
+#    Hourly bars on :30; a 15:30 bar ends at 16:00 and a 12:30 bar on the
+#    half-day at 13:00 (short last bars, B3).
+# 2. Bars: 11-27 14:30, 15:30; 11-29 09:30, 10:30, 11:30, 12:30; 12-02 09:30.
+#    Weights AAA 0.5, BBB 0.5; br0 = 1000; fill="close".
+#            11-27       11-29                       12-02
+#    bar     14:30 15:30 09:30 10:30 11:30 12:30     09:30
+#    AAA O    99   100   103   104   101   105       104
+#    AAA C   100   102   104   101   105   106       108
+#    BBB O    49    50    51    52    52    50        50
+#    BBB C    50    48    52    52    50    51        53
+# 3. Fill (B2, "close"): V(C_{1,1}) = br0 at the first bar's close, 11-27
+#    15:30. Shares n_i = w_i br0 / P_i: n_AAA = 500/100 = 5, n_BBB = 500/50 = 10.
+#    Session 1 has no open mark.
+# 4. Marks and values, V = 5 P_AAA + 10 P_BBB at the prices of each mark
+#    (B1.1; an open mark at its bar's open, every other mark at a close):
+#    - 11-27 15:30 (fill)        5*100 + 10*50 = 1000
+#    - 11-27 16:00 (15:30 bar C) 5*102 + 10*48 =  990
+#    - 11-29 09:30 (open mark)   5*103 + 10*51 = 1025
+#    - 11-29 10:30               5*104 + 10*52 = 1040
+#    - 11-29 11:30               5*101 + 10*52 = 1025
+#    - 11-29 12:30               5*105 + 10*50 = 1025
+#    - 11-29 13:00 (half-day C)  5*106 + 10*51 = 1040
+#    - 12-02 09:30 (open mark)   5*104 + 10*50 = 1020
+#    - 12-02 10:30               5*108 + 10*53 = 1070
+#    The history ends mid-session on 12-02, which the backtest allows.
+# 5. Classes (U1, B1.2-B1.4), by the mark each return ends at:
+#    - 11-27 16:00: close to close, regular (B1.3)
+#    - 11-29 09:30: g = V(O)/V(C_prev) - 1 = 1025/990 - 1, gap (B1.4)
+#    - 11-29 10:30: r_1 = V(C_1)/V(O_1) - 1 = 1040/1025 - 1, regular (B1.2)
+#    - 11-29 11:30, 12:30, 13:00: close to close, regular (B1.3)
+#    - 12-02 09:30: gap; 12-02 10:30: regular
+# 6. B1 identity for 11-29 (K = 4):
+#    (1+g)(1+r_1)(1+r_2)(1+r_3)(1+r_4)
+#      = (1025/990)(1040/1025)(1025/1040)(1025/1025)(1040/1025)
+#      = 1040/990 = V(C_{11-29,4})/V(C_{11-27,K}), and 11-29 has K + 1 = 5 marks.
+# 7. No warnings: every held symbol is fresh at every mark, no bar is outside
+#    a session.
+rule: [B1.1, B1.2, B1.3, B1.4, B2, B3, U1]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00",
+         "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00", "2024-12-02T09:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [99.0, 100.0, 103.0, 104.0, 101.0, 105.0, 104.0]
+      BBB: [49.0, 50.0, 51.0, 52.0, 52.0, 50.0, 50.0]
+    Close:
+      AAA: [100.0, 102.0, 104.0, 101.0, 105.0, 106.0, 108.0]
+      BBB: [50.0, 48.0, 52.0, 52.0, 50.0, 51.0, 53.0]
+  w: {AAA: 0.5, BBB: 0.5}
+  br0: 1000
+  fill: close
+expected:
+  labels: ["2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 990.0, 1025.0, 1040.0, 1025.0, 1025.0, 1040.0, 1020.0, 1070.0]
+  classes: [regular, gap, regular, regular, regular, regular, gap, regular]
+  warns: []
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

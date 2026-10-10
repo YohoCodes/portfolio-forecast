@@ -1,0 +1,40 @@
+# MC7, MC5: with n_regimes = None the regime count is selected by criterion
+# (default BIC). Two well-separated regimes beat one, so the simulated draws
+# are bimodal at +/-0.02 with almost none near 0.
+#
+# History: a plain array (generated, test_golden.generated_history, seed 31):
+# 3000 returns from a two-state Markov chain started in state 0,
+#   P = [[0.9, 0.1], [0.1, 0.9]],
+#   state 0: l ~ N(+0.02, 0.002^2),  state 1: l ~ N(-0.02, 0.002^2).
+# The two emissions are 20 standard deviations apart, so the regime of every
+# l, history or simulated, is its sign (P(wrong sign) = P(Z > 10) < 1e-22).
+# On this seed the history switches sign at 9.57% of its 2999 steps and is
+# 49.8% positive.
+#
+# Derivation
+# 1. BIC = -2 log L + k ln n, k = (S - 1) + S(S - 1) + 2S for one class.
+#    S = 1: one normal for a +/-0.02 mixture, sigma about 0.02;
+#    S = 2: the true model. Per mark, log L gains ln(0.0201/0.002) = 2.31
+#    from the narrower emission and pays the chain's entropy
+#    H(0.1) = -(0.1 ln 0.1 + 0.9 ln 0.9) = 0.325: about 3000 x 1.98 = 5950 for
+#    4 extra parameters (penalty 4 ln 3000 = 32). S >= 2 is selected.
+# 2. Draws: with S = 2, l ~ N(+/-0.02, 0.002^2): P(|l| < 0.01) = P(Z > 5) x 2
+#    = 5.7e-7. Had S = 1 been selected, l ~ N(0, 0.02^2): P(|l| < 0.01)
+#    = 0.38. Bound: share of |l| < 0.01 at most 0.01 over 200 x 50 draws.
+rule: [MC7, MC5]
+kind: regime_switching_monte_carlo
+inputs:
+  generate:
+    kind: array
+    returns: 3000
+    seed: 31
+    regular:
+      regimes: {P: [[0.9, 0.1], [0.1, 0.9]], means: [0.02, -0.02], sds: [0.002, 0.002]}
+  sim_length: 50
+  n_sims: 200
+  random_state: 34
+  options: {n_regimes: null}
+expected:
+  dates_none: true
+  share_near_zero: {threshold: 0.01, max: 0.01}
+tolerance: 0  # bounds in expected

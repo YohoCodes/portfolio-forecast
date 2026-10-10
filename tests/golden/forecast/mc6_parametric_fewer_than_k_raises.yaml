@@ -1,0 +1,24 @@
+# MC6: a class that cannot be fitted (n < k for a k-parameter family) always
+# raises, even with min_sample = 0.
+#
+# History: daily closes (XNYS, EST UTC-05:00), fill="close" layout:
+#   2024-12-02 16:00 100, 12-03 101, 12-04 100.5.
+#
+# Derivation
+# 1. One class (daily), n = 2 returns. distribution = Student's t: k = 3
+#    parameters (df, loc, scale). n = 2 < k = 3: cannot be fitted.
+# 2. MC6: raises ValueError regardless of min_sample = 0. The spec fixes no
+#    wording for this error, so only the type is checked.
+rule: [MC6]
+kind: parametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.5]
+  sim_length: 5
+  n_sims: 3
+  random_state: 0
+  options: {distribution: t, min_sample: 0}
+expected:
+  raises: ValueError
+tolerance: 0  # raise only

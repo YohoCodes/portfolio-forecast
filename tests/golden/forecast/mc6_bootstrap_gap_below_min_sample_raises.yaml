@@ -1,0 +1,39 @@
+# MC6: a class below min_sample raises, naming the class, its n and the
+# history needed.
+#
+# History: the hourly book of mc3_bootstrap_constant_hourly_half_day.yaml
+#   (XNYS, 2024-11-25 to 11-27, fill="open"): 2 gaps and 21 regular returns.
+#
+# Derivation
+# 1. min_sample = 10. Regular: n = 21 >= 10, fine. Gap: n = 2 < 10, so the
+#    call raises ValueError (MC6).
+# 2. The message names the class ("gap"), its n (2, standing alone) and the
+#    history needed (worded with "history" or "session"); the exact wording is
+#    the implementer's, so the regex checks only those three.
+rule: [MC6]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-11-25T09:30:00-05:00", "2024-11-25T10:30:00-05:00", "2024-11-25T11:30:00-05:00",
+           "2024-11-25T12:30:00-05:00", "2024-11-25T13:30:00-05:00", "2024-11-25T14:30:00-05:00",
+           "2024-11-25T15:30:00-05:00", "2024-11-25T16:00:00-05:00",
+           "2024-11-26T09:30:00-05:00", "2024-11-26T10:30:00-05:00", "2024-11-26T11:30:00-05:00",
+           "2024-11-26T12:30:00-05:00", "2024-11-26T13:30:00-05:00", "2024-11-26T14:30:00-05:00",
+           "2024-11-26T15:30:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T09:30:00-05:00", "2024-11-27T10:30:00-05:00", "2024-11-27T11:30:00-05:00",
+           "2024-11-27T12:30:00-05:00", "2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00",
+           "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.20020013340003, 100.40080106773419, 100.6018036054065, 100.80320855042736,
+           101.00501670841682, 101.2072288866078, 101.30848673598094,
+           100.30045045033772, 100.50125208594012, 100.70245572668487, 100.9040621773868,
+           101.10607224447199, 101.30848673598095, 101.51130646157193, 101.61286854060953,
+           100.60180360540653, 100.80320855042739, 101.00501670841685, 101.20722888660782,
+           101.40984589384928, 101.61286854060953, 101.81629763897942, 101.91816486174085]
+  sim_length: 2
+  n_sims: 3
+  random_state: 0
+  options: {min_sample: 10}
+expected:
+  raises: ValueError
+  match: '(?is)^(?=.*\bgap)(?=.*(?<![\d.:/-])2(?![\d.:/-]))(?=.*(histor|session))'
+tolerance: 0  # raise only

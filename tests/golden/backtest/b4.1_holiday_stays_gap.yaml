@@ -1,0 +1,41 @@
+# B4.1: a holiday is not a missing session. The return across
+# Thanksgiving to the next open mark stays a gap. Same shape as
+# b4.1_missing_session_hourly.yaml, but the skipped day is a holiday.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-27 (Wed) is a full session,
+#    09:30-16:00; 2024-11-28 is Thanksgiving, not a session; 2024-11-29 is a
+#    half-day, 09:30-13:00. Hourly bars on :30.
+# 2. Data, A held: 11-27 bars 13:30, 14:30, 15:30 (short, to 16:00); 11-29 bars
+#    09:30, 10:30, 11:30, 12:30 (short, to 13:00).
+# 3. Marks (fill="close"): 11-27 14:30 (fill), 15:30, 16:00; 11-29 09:30 (open
+#    mark), 10:30, 11:30, 12:30, 13:00. 8 marks.
+# 4. Freshness: own price at every mark, fresh everywhere.
+# 5. Classes:
+#    - 11-27 15:30, 16:00: regular
+#    - 11-29 09:30: from 11-27 16:00 (C_{d-1,K}) to the open mark at the 09:30
+#      session open. No scheduled mark lies between them (11-28 has no
+#      session), so B4.1 does not apply: gap (B1.4)
+#    - 11-29 10:30 ... 13:00: regular
+rule: [B4.1, B1.4]
+kind: history_marks
+inputs:
+  bars: ["2024-11-27T13:30:00-05:00", "2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00",
+         "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 102.0, 104.0, 105.0, 106.0, 107.0]
+  closes:
+    A: [101.0, 102.0, 103.0, 105.0, 106.0, 107.0, 108.0]
+  held: {A: true}
+  fill: close
+expected:
+  labels: ["2024-11-27T14:30:00-05:00", "2024-11-27T15:30:00-05:00", "2024-11-27T16:00:00-05:00",
+           "2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true, true, true, true, true]
+  classes: [regular, regular, gap, regular, regular, regular, regular]
+tolerance: 0  # labels, flags and classes, compared exactly

@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
+from portfolio_forecast import SimulationResult
 from portfolio_forecast.forecast import nonparametric_monte_carlo, parametric_monte_carlo, regime_switching_monte_carlo
 
 # Every simulator, with keyword arguments that keep the fits quick and quiet
@@ -27,25 +28,25 @@ class TestSimsContract:
     """Every simulator returns the documented sims array."""
 
     def test_shape_start_and_values(self, simulate, kwargs, prices):
-        sims = simulate(prices, sim_length=20, n_sims=30, random_state=1, **kwargs)
+        sims = simulate(prices, sim_length=20, n_sims=30, random_state=1, **kwargs).paths
         assert sims.shape == (30, 21)
         assert np.all(sims[:, 0] == 1.0)
         assert np.isfinite(sims).all()
 
     def test_accepts_a_series(self, simulate, kwargs, prices):
-        sims = simulate(prices["X"], sim_length=5, n_sims=4, random_state=1, **kwargs)
+        sims = simulate(prices["X"], sim_length=5, n_sims=4, random_state=1, **kwargs).paths
         assert sims.shape == (4, 6)
 
     def test_int_seed_gives_distinct_reproducible_paths(self, simulate, kwargs, prices):
         # An int seed once restarted the draws on every path, so all paths matched
-        a = simulate(prices, sim_length=10, n_sims=50, random_state=7, **kwargs)
-        b = simulate(prices, sim_length=10, n_sims=50, random_state=7, **kwargs)
+        a = simulate(prices, sim_length=10, n_sims=50, random_state=7, **kwargs).paths
+        b = simulate(prices, sim_length=10, n_sims=50, random_state=7, **kwargs).paths
         assert np.array_equal(a, b)
         assert len(np.unique(a[:, -1])) == 50
 
     def test_generator_seed_is_reproducible(self, simulate, kwargs, prices):
-        a = simulate(prices, sim_length=10, n_sims=5, random_state=np.random.default_rng(3), **kwargs)
-        b = simulate(prices, sim_length=10, n_sims=5, random_state=np.random.default_rng(3), **kwargs)
+        a = simulate(prices, sim_length=10, n_sims=5, random_state=np.random.default_rng(3), **kwargs).paths
+        b = simulate(prices, sim_length=10, n_sims=5, random_state=np.random.default_rng(3), **kwargs).paths
         assert np.array_equal(a, b)
 
 
@@ -61,7 +62,7 @@ class TestDeprecatedPrices:
         expected = simulate(prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
         with pytest.warns(DeprecationWarning, match="removed in 1.0.0"):
             got = simulate(prices=prices, sim_length=5, n_sims=3, random_state=1, **kwargs)
-        np.testing.assert_array_equal(got, expected)
+        np.testing.assert_array_equal(got.paths, expected.paths)
 
     def test_warning_points_at_the_caller(self, simulate, kwargs, prices):
         with pytest.warns(DeprecationWarning) as record:
@@ -79,7 +80,7 @@ class TestDeprecatedPrices:
 
 class TestNonparametric:
     def test_every_draw_is_a_historical_return(self, prices):
-        sims = nonparametric_monte_carlo(prices, sim_length=25, n_sims=20, random_state=0)
+        sims = nonparametric_monte_carlo(prices, sim_length=25, n_sims=20, random_state=0).paths
         history = prices["X"].pct_change().dropna().to_numpy()
         drawn = (sims[:, 1:] / sims[:, :-1] - 1).ravel()
         assert np.isclose(drawn[:, None], history[None, :]).any(axis=1).all()
@@ -91,22 +92,22 @@ class TestNonparametric:
 
 
 class TestParametric:
-    def test_selects_by_aic_and_reports_it(self, prices, capsys):
+    def test_selects_by_bic_and_reports_it(self, prices, capsys):
         parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=0)
         out = capsys.readouterr().out
         for name in ("norm", "t", "johnsonsu"):
-            assert f"{name} AIC" in out
+            assert f"{name} BIC" in out
         assert "Selected:" in out
 
     def test_given_distribution_skips_selection(self, prices, capsys):
         parametric_monte_carlo(prices, distribution=stats.laplace, sim_length=5, n_sims=2,
                                random_state=0)
-        assert "AIC" not in capsys.readouterr().out
+        assert "BIC" not in capsys.readouterr().out
 
     def test_mean_return_matches_fitted_normal(self, prices):
         # With a normal fit, simulated one-period returns center on the historical mean
         sims = parametric_monte_carlo(prices, distribution=stats.norm, sim_length=200,
-                                      n_sims=200, random_state=0)
+                                      n_sims=200, random_state=0).paths
         drawn = sims[:, 1:] / sims[:, :-1] - 1
         history = prices["X"].pct_change().dropna()
         assert drawn.mean() == pytest.approx(history.mean(), abs=3 * history.std() / np.sqrt(drawn.size))
@@ -116,7 +117,7 @@ class TestParametric:
 class TestRegimeSwitching:
     def test_bootstrap_draws_are_historical_log_returns(self, two_regime_prices):
         sims = regime_switching_monte_carlo(two_regime_prices, n_regimes=2, bootstrap=True,
-                                            n_starts=3, sim_length=15, n_sims=20, random_state=0)
+                                            n_starts=3, sim_length=15, n_sims=20, random_state=0).paths
         history = np.log(two_regime_prices).diff().dropna().to_numpy()
         drawn = np.diff(np.log(sims), axis=1).ravel()
         assert np.isclose(drawn[:, None], history[None, :]).any(axis=1).all()
@@ -134,36 +135,37 @@ class TestRegimeSwitching:
 
 
 class TestParametricFit:
-    def test_returns_only_sims_by_default(self, prices):
+    def test_returns_a_simulation_result(self, prices):
         out = parametric_monte_carlo(prices, distribution=stats.norm, sim_length=5, n_sims=3, random_state=0)
-        assert isinstance(out, np.ndarray)
+        assert isinstance(out, SimulationResult) and out.fit is not None
 
-    def test_fit_does_not_change_the_paths(self, prices):
+    def test_return_fit_is_deprecated_and_does_not_change_the_paths(self, prices):
         plain = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=5)
-        sims, _ = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=5, return_fit=True)
-        np.testing.assert_allclose(sims, plain, rtol=1e-9)
+        with pytest.warns(DeprecationWarning, match="return_fit"):
+            sims = parametric_monte_carlo(prices, sim_length=10, n_sims=20, random_state=5, return_fit=True)
+        np.testing.assert_allclose(sims.paths, plain.paths, rtol=1e-9)
 
-    def test_selection_reports_the_lowest_aic(self, prices):
-        _, fit = parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=0, return_fit=True)
-        aics = fit["Candidates"]
-        assert set(aics) == {"norm", "t", "johnsonsu"}
-        assert list(aics.values()) == sorted(aics.values())
-        assert fit["Distribution"] == next(iter(aics))
-        assert fit["AIC"] == pytest.approx(aics[fit["Distribution"]])
+    def test_selection_reports_the_lowest_bic(self, prices):
+        fit = parametric_monte_carlo(prices, sim_length=5, n_sims=2, random_state=0).fit["regular"]
+        bics = fit["Candidates"]
+        assert set(bics) == {"norm", "t", "johnsonsu"}
+        assert list(bics.values()) == sorted(bics.values())
+        assert fit["Distribution"] == next(iter(bics))
+        assert fit["BIC"] == pytest.approx(bics[fit["Distribution"]])
 
     def test_given_distribution_reports_its_fit(self, prices):
-        _, fit = parametric_monte_carlo(prices, distribution=stats.t, sim_length=5, n_sims=2,
-                                        random_state=0, return_fit=True)
+        fit = parametric_monte_carlo(prices, distribution=stats.t, sim_length=5, n_sims=2,
+                                     random_state=0, criterion="AIC").fit["regular"]
         assert fit["Distribution"] == "t" and fit["Candidates"] is None
         assert list(fit["Parameters"]) == ["df", "loc", "scale"]
-        data = prices["X"].pct_change().dropna().to_numpy()
+        data = np.log(prices["X"]).diff().dropna().to_numpy()
         params = list(fit["Parameters"].values())
         assert fit["AIC"] == pytest.approx(2 * 3 - 2 * stats.t.logpdf(data, *params).sum())
 
     def test_parameters_are_named_for_each_distribution(self, prices):
         for dist, names in [(stats.norm, ["loc", "scale"]), (stats.johnsonsu, ["a", "b", "loc", "scale"])]:
-            _, fit = parametric_monte_carlo(prices, distribution=dist, sim_length=2, n_sims=1,
-                                            random_state=0, return_fit=True)
+            fit = parametric_monte_carlo(prices, distribution=dist, sim_length=2, n_sims=1,
+                                         random_state=0).fit["regular"]
             assert list(fit["Parameters"]) == names
 
 
@@ -171,28 +173,29 @@ class TestRegimeFit:
     @pytest.fixture
     def fitted(self, two_regime_prices):
         return regime_switching_monte_carlo(two_regime_prices, n_starts=3, sim_length=10, n_sims=20,
-                                            random_state=0, return_fit=True)
+                                            random_state=0)
 
-    def test_returns_only_sims_by_default(self, prices):
+    def test_returns_a_simulation_result(self, prices):
         out = regime_switching_monte_carlo(prices, n_regimes=1, n_starts=1, sim_length=5, n_sims=3,
                                            random_state=0)
-        assert isinstance(out, np.ndarray)
+        assert isinstance(out, SimulationResult) and out.fit is not None
 
-    def test_fit_does_not_change_the_paths(self, two_regime_prices, fitted):
-        plain = regime_switching_monte_carlo(two_regime_prices, n_starts=3, sim_length=10, n_sims=20,
-                                             random_state=0)
+    def test_return_fit_is_deprecated_and_does_not_change_the_paths(self, two_regime_prices, fitted):
+        with pytest.warns(DeprecationWarning, match="return_fit"):
+            again = regime_switching_monte_carlo(two_regime_prices, n_starts=3, sim_length=10, n_sims=20,
+                                                 random_state=0, return_fit=True)
         # The HMM fit can differ in the last bits with memory layout, so compare closely, not exactly
-        np.testing.assert_allclose(fitted[0], plain, rtol=1e-9)
+        np.testing.assert_allclose(again.paths, fitted.paths, rtol=1e-9)
 
     def test_selected_count_has_the_lowest_bic(self, fitted):
-        _, fit = fitted
+        fit = fitted.fit
         assert fit["Regime Count"] == min(fit["BIC"], key=fit["BIC"].get)
         assert set(fit["BIC"]) <= {1, 2, 3}
         # The history has a calm and a turbulent regime, so more than one is chosen
         assert fit["Regime Count"] >= 2
 
     def test_regime_table(self, fitted):
-        _, fit = fitted
+        fit = fitted.fit
         regimes, P = fit["Regimes"], fit["Transition Matrix"]
         assert len(regimes) == fit["Regime Count"] == P.shape[0] == P.shape[1]
         assert list(regimes.columns) == ["Mean", "Volatility", "Expected Duration", "Current Probability"]
@@ -202,15 +205,10 @@ class TestRegimeFit:
         np.testing.assert_allclose(regimes["Expected Duration"], 1 / (1 - np.diag(P)))
 
     def test_given_regime_count_reports_only_its_bic(self, prices):
-        _, fit = regime_switching_monte_carlo(prices, n_regimes=1, n_starts=1, sim_length=5, n_sims=2,
-                                              random_state=0, return_fit=True)
+        fit = regime_switching_monte_carlo(prices, n_regimes=1, n_starts=1, sim_length=5, n_sims=2,
+                                           random_state=0).fit
         assert fit["Regime Count"] == 1 and list(fit["BIC"]) == [1]
         assert fit["Regimes"]["Current Probability"].iloc[0] == pytest.approx(1)
-
-
-def prices_from_returns(returns):
-    """A price series whose one-period simple returns are exactly `returns`."""
-    return pd.Series(100 * np.cumprod(np.r_[1, 1 + np.asarray(returns)]))
 
 
 def prices_from_log_returns(log_returns):
@@ -235,13 +233,12 @@ class TestAicSelection:
     """The parametric simulator's AIC search, checked against independent fits
     and against data whose best distribution is known."""
 
-    def fit(self, returns, **kwargs):
-        _, fit = parametric_monte_carlo(prices_from_returns(returns), sim_length=1, n_sims=1,
-                                        random_state=0, return_fit=True, **kwargs)
-        return fit
+    def fit(self, log_returns, **kwargs):
+        return parametric_monte_carlo(prices_from_log_returns(log_returns), sim_length=1, n_sims=1,
+                                      random_state=0, criterion="AIC", **kwargs).fit["regular"]
 
     def test_candidate_aics_match_an_independent_fit(self, prices):
-        data = prices["X"].pct_change().dropna().to_numpy()
+        data = np.log(prices["X"]).diff().dropna().to_numpy()
         fit = self.fit(data)
         for dist in (stats.norm, stats.t, stats.johnsonsu):
             params = dist.fit(data)
@@ -270,9 +267,8 @@ class TestBicSelection:
     values and against data with a known number of regimes."""
 
     def fit(self, log_returns, **kwargs):
-        _, fit = regime_switching_monte_carlo(prices_from_log_returns(log_returns), sim_length=1,
-                                              n_sims=1, random_state=0, return_fit=True, **kwargs)
-        return fit
+        return regime_switching_monte_carlo(prices_from_log_returns(log_returns), sim_length=1,
+                                            n_sims=1, random_state=0, **kwargs).fit
 
     def test_one_regime_matches_the_closed_form_normal_fit(self):
         # One regime is a single normal: its maximum-likelihood mean and

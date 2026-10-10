@@ -1,0 +1,25 @@
+# B2, B1.5: fill="open" on hourly closes raises ValueError. Both rules call for
+# it (no opens to fill at, and intraday input without opens), so the message
+# is not pinned.
+#
+# Derivation
+# 1. Data: hourly closes only (flat columns), 2024-11-29 09:30, 10:30, 11:30,
+#    12:30 EST.
+# 2. B2: fill="open" on data without opens raises ValueError; B1.5: intraday
+#    input without opens raises ValueError.
+rule: [B2, B1.5]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+         "2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  layout: closes
+  prices:
+    Close:
+      AAA: [101.0, 102.0, 103.0, 104.0]
+  w: {AAA: 1.0}
+  br0: 1000
+  fill: open
+expected:
+  raises: ValueError
+tolerance: 0  # no output; the call must raise

@@ -1,0 +1,28 @@
+# MC6: parametric takes min_sample too (default 30); a daily history with three
+# returns raises, naming the class, n = 3 and the history needed.
+#
+# History: daily closes (XNYS, EST UTC-05:00), fill="close" layout:
+#   2024-12-02 16:00 100, 12-03 101, 12-04 100.5, 12-05 102.
+#
+# Derivation
+# 1. Daily input: one class (MC1), the daily returns, classed "regular" (design
+#    1.1); n = 3 < 30 = min_sample (default), so ValueError (MC6), before any
+#    fit (distribution fixed to the normal, k = 2 <= 3, so only min_sample
+#    can fail).
+# 2. The message names the class ("regular", or "daily" for the one daily
+#    class), n = 3 standing alone, and the history needed.
+rule: [MC6]
+kind: parametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00",
+           "2024-12-04T16:00:00-05:00", "2024-12-05T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.5, 102.0]
+  sim_length: 5
+  n_sims: 3
+  random_state: 0
+  options: {distribution: norm}
+expected:
+  raises: ValueError
+  match: '(?is)^(?=.*\b(regular|daily))(?=.*(?<![\d.:/-])3(?![\d.:/-]))(?=.*(histor|session))'
+tolerance: 0  # raise only

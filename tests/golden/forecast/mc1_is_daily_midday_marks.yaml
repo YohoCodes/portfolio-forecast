@@ -1,0 +1,20 @@
+# MC1: one mark per session at 12:00 is not daily: daily needs each mark
+# at its session's close.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 12:00 on 2024-11-25, 11-26, 11-27 and 11-29
+#    (Thanksgiving 11-28 closed; 11-29 a half-day closing 13:00, so 12:00 is
+#    inside it). One mark per session, none at its close (16:00, or 13:00 on
+#    11-29), and the first is not a fill mark followed by its session's close.
+# 2. MC1: daily iff at most one mark per session at the session close (plus
+#    an optional initial fill mark). The marks are not at the close: not daily.
+rule: [MC1]
+kind: is_daily
+inputs:
+  labels: ["2024-11-25T12:00:00-05:00", "2024-11-26T12:00:00-05:00",
+           "2024-11-27T12:00:00-05:00", "2024-11-29T12:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.5]
+expected:
+  value: false
+tolerance: 0  # a boolean

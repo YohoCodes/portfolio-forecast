@@ -1,0 +1,38 @@
+# M8: yearly returns on monthly values spanning three years. The first year is
+# measured from br0 and is partial; a year is full iff the series covers its
+# first and last sessions.
+#
+# Derivation
+# 1. Monthly marks as simulate_buy_and_hold(fill="open") labels them (B3): the
+#    fill at 2023-12-01 09:30 (the first session of December 2023), then each
+#    month's last session close (XNYS; EDT UTC-04:00 from March to October):
+#    2023-12-29 16:00 102; 2024: 01-31 103, 02-29 104, 03-28 105 (03-29 Good
+#    Friday), 04-30 104, 05-31 106, 06-28 107, 07-31 108, 08-30 109, 09-30 110,
+#    10-31 111, 11-29 13:00 111.5 (half-day), 12-31 16:00 112.2; 2025-01-31
+#    16:00 110. br0 = 100 at the fill.
+# 2. Years (a mark's year is its session's year):
+#    - 2023: R = V(last 2023 mark)/br0 - 1 = 102/100 - 1 = 0.02. The series
+#      starts 2023-12-01, after the year's first session (2023-01-03): partial.
+#    - 2024: R = 112.2/102 - 1 = 0.1. The series covers 2024-01-02 (it runs
+#      from before it) and 2024-12-31 (its last session, a mark): full.
+#    - 2025: R = 110/112.2 - 1 = -0.0196078431. It ends 2025-01-31, before the
+#      year's last session: partial.
+rule: [M8]
+kind: performance_report
+inputs:
+  labels: ["2023-12-01T09:30:00-05:00", "2023-12-29T16:00:00-05:00",
+           "2024-01-31T16:00:00-05:00", "2024-02-29T16:00:00-05:00", "2024-03-28T16:00:00-04:00",
+           "2024-04-30T16:00:00-04:00", "2024-05-31T16:00:00-04:00", "2024-06-28T16:00:00-04:00",
+           "2024-07-31T16:00:00-04:00", "2024-08-30T16:00:00-04:00", "2024-09-30T16:00:00-04:00",
+           "2024-10-31T16:00:00-04:00", "2024-11-29T13:00:00-05:00", "2024-12-31T16:00:00-05:00",
+           "2025-01-31T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 102.0, 103.0, 104.0, 105.0, 104.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+           111.0, 111.5, 112.2, 110.0]
+  interval: "1 month"
+expected:
+  yearly:
+    years: [2023, 2024, 2025]
+    return: [0.02, 0.1, -0.0196078431372549]
+    is_full: [false, true, false]
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

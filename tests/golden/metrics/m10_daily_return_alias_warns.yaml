@@ -1,0 +1,23 @@
+# M10: calculate_daily_return is a deprecated alias of
+# calculate_period_returns: same result, plus a DeprecationWarning.
+#
+# Derivation
+# 1. Same marks as m10_period_returns.yaml; same returns: 0.01,
+#    -0.0099009901, -0.05, 0.0315789474.
+# 2. M10: the alias "remains a deprecated alias raising DeprecationWarning".
+#    The wording is not fixed; the entry accepts any message mentioning the
+#    deprecation or the new name.
+rule: [M10]
+kind: calculate_daily_return
+inputs:
+  labels: ["2024-11-29T11:30:00-05:00", "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 100.0, 95.0, 98.0]
+expected:
+  labels: ["2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  values: [0.01, -0.009900990099009901, -0.05, 0.031578947368421054]
+  deprecation:
+    - {match: "deprecat|calculate_period_returns"}
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

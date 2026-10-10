@@ -1,0 +1,30 @@
+# M4: on the session clock a history ending mid-session counts its
+# partial last session whole.
+#
+# Derivation
+# 1. Hourly marks (XNYS, EST UTC-05:00), fill="open":
+#    2024-11-29 (half-day) 09:30 100 (fill), 10:30 101, 11:30 101, 12:30 101,
+#    13:00 100; 2024-12-02 09:30 95 (open mark), 10:30 98, 11:30 99. The
+#    history ends at 11:30, before the 16:00 close.
+# 2. N = sessions after the fill: 11-29 (partial first session counts whole)
+#    and 12-02 (partial last session counts whole, M4) = 2; Y = 2/252
+#    = 0.0079365079.
+# 3. Total Return = 99/100 - 1 = -0.01; CAGR = 0.99^(252/2) - 1 = 0.99^126 - 1
+#    = -0.7181393045.
+rule: [M4]
+kind: performance_report
+inputs:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 101.0, 101.0, 100.0, 95.0, 98.0, 99.0]
+  as_backtest_result: true
+  classes: [regular, regular, regular, regular, gap, regular, regular]
+  interval: "1 hour"
+expected:
+  report:
+    Total Return: -0.01
+    CAGR: -0.7181393044595366
+    Total Years: 0.007936507936507936
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

@@ -1,0 +1,26 @@
+# MC5, MC4: `return_fit` is a deprecated keyword, ignored: it raises a
+# DeprecationWarning and the result is still a SimulationResult with its fit.
+#
+# Input: a plain array (generated, seed 61): 100 values, l ~ N(0.0005, 0.01^2).
+#
+# Derivation
+# 1. return_fit=True: DeprecationWarning naming return_fit (fit
+#    replaces return_fit, kept until 1.0.0); no tuple, a SimulationResult.
+# 2. fit is always filled for parametric: not None. distribution = norm fixed
+#    so no selection is involved; n = 99 >= 30.
+# 3. Plain array: dates None; sim_length = 5 steps, paths 4 x 6.
+rule: [MC5, MC4]
+kind: parametric_monte_carlo
+inputs:
+  generate: {kind: array, returns: 99, seed: 61, regular: {mean: 0.0005, sd: 0.01}}
+  sim_length: 5
+  n_sims: 4
+  random_state: 0
+  options: {distribution: norm, return_fit: true}
+expected:
+  shape: [4, 6]
+  dates_none: true
+  fit_none: false
+  deprecation:
+    - {match: "return_fit"}
+tolerance: 0  # shape and flags only

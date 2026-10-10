@@ -1,0 +1,41 @@
+# M1, M4: weekly values use their own bar returns annualized with 52,
+# and the session clock counts the sessions the bars span.
+#
+# Derivation
+# 1. Weekly marks as simulate_buy_and_hold(fill="open") labels them (B3): the
+#    fill at the first week's first open, then each week's last close.
+#    XNYS, EST UTC-05:00:
+#    - 2024-11-18 09:30  100 (fill)
+#    - 2024-11-22 16:00  101       week of 11-18: 5 sessions
+#    - 2024-11-29 13:00  103.02    week of 11-25: 4 sessions (11-28 closed)
+#    - 2024-12-06 16:00  101.9898  week of 12-02: 5 sessions
+#    - 2024-12-13 16:00  104.029596 week of 12-09: 5 sessions
+# 2. Bar returns 0.01, 0.02, -0.01, 0.02. The first runs from the fill open to
+#    the week's close, not close to close: excluded from risk figures (M2,
+#    "always, except daily fill="close""). Risk series [0.02, -0.01, 0.02].
+# 3. sd = sqrt(0.0003) (as in Book D, m1_daily_fill_open_report.yaml);
+#    Annualized Volatility = sqrt(0.0003 x 52) = sqrt(0.0156) = 0.1248999600.
+#    Sharpe = 0.01/sqrt(0.0003) x sqrt(52) = sqrt(52/3) = 4.1633319989.
+#    DD = sqrt(0.01^2/3); Downside Volatility = DD sqrt(52) = 0.0416333200;
+#    Sortino = 0.01 sqrt(52)/DD = sqrt(156) = 12.4899959968.
+# 4. CAGR (M4, session clock, M1): N = sessions spanned after the fill
+#    = 5 + 4 + 5 + 5 = 19; Y = 19/252 = 0.0753968254;
+#    CAGR = 1.04029596^(252/19) - 1 = 0.6887090529. Total Return 0.04029596.
+rule: [M1, M4, M2]
+kind: performance_report
+inputs:
+  labels: ["2024-11-18T09:30:00-05:00", "2024-11-22T16:00:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-06T16:00:00-05:00", "2024-12-13T16:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 103.02, 101.9898, 104.029596]
+  interval: "1 week"
+expected:
+  report:
+    Total Return: 0.04029596
+    CAGR: 0.6887090528985425
+    Total Years: 0.07539682539682539
+    Annualized Volatility: 0.12489995996796796
+    Sharpe Ratio: 4.163331998932265
+    Downside Volatility: 0.041633319989322654
+    Sortino Ratio: 12.489995996796795
+tolerance: {abs: 1.0e-12, rel: 1.0e-9}

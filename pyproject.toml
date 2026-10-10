@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "portfolio-forecast"
-version = "0.3.0"
+version = "0.4.0"
 description = "Monte Carlo simulation of future portfolio and strategy returns"
-readme = "README.md"
+readme = "PYPI.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
@@ -15,7 +15,6 @@ dependencies = [
     "pandas",
     "scipy",
     "matplotlib",
-    "hmmlearn",
     "exchange_calendars",
     "python-dateutil",
 ]
@@ -25,9 +24,10 @@ Repository = "https://github.com/YohoCodes/portfolio-forecast"
 Changelog = "https://github.com/YohoCodes/portfolio-forecast/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-# The demo notebooks, which download prices from Yahoo Finance
+# The demo notebooks: 01 and 02 download prices from Yahoo Finance, 03 is synthetic
 notebook = ["ipykernel", "yfinance"]
-test = ["pytest"]
+# hmmlearn: the reference the custom HMM EM is checked against (tests/forecast)
+test = ["pytest", "pyyaml", "hmmlearn"]
 lint = ["ruff"]
 
 [tool.setuptools.packages.find]

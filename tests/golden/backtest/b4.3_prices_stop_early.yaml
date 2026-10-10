@@ -1,0 +1,48 @@
+# B4.3: a symbol's prices stop two sessions before the end. After its last
+# price the position is cash at 0%, worth n_i P_i^last and always fresh, so
+# later returns keep their class; a warning names the symbol and its last
+# price date.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-12-02 (Mon) to 12-06 (Fri), full
+#    sessions closing 16:00.
+# 2. Daily bars 12-02 ... 12-06; weights AAA 0.5, BBB 0.5; br0 = 1000;
+#    fill="close".
+#    date      12-02 12-03 12-04 12-05 12-06
+#    AAA C     100   102   104   103   105
+#    BBB C      50    52   null  null  null   (last price 52 on 2024-12-03)
+# 3. n_AAA = 500/100 = 5, n_BBB = 500/50 = 10. BBB has no later price in the
+#    full history, so it is "stopped" (B4.3), worth 10*52 = 520 from 12-03 on.
+# 4. Values, V = 5 P_AAA + BBB:
+#    - 12-02: 500 + 500 = 1000
+#    - 12-03: 510 + 520 = 1030
+#    - 12-04: 520 + 520 = 1040
+#    - 12-05: 515 + 520 = 1035
+#    - 12-06: 525 + 520 = 1045
+# 5. Classes: BBB's cash is always fresh (B4.3), AAA fresh everywhere:
+#    regular x 4 (not irregular, as plain forward fill would make them).
+# 6. Warnings: one, naming BBB with its last price date 2024-12-03; no B4.1
+#    warning, since no return is irregular.
+rule: [B4.3, B4.1]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-12-02", "2024-12-03", "2024-12-04", "2024-12-05", "2024-12-06"]
+  prices:
+    Open:
+      AAA: [99.0, 101.0, 102.0, 104.0, 103.0]
+      BBB: [49.0, 51.0, null, null, null]
+    Close:
+      AAA: [100.0, 102.0, 104.0, 103.0, 105.0]
+      BBB: [50.0, 52.0, null, null, null]
+  w: {AAA: 0.5, BBB: 0.5}
+  br0: 1000
+  fill: close
+expected:
+  labels: ["2024-12-02T16:00:00-05:00", "2024-12-03T16:00:00-05:00", "2024-12-04T16:00:00-05:00",
+           "2024-12-05T16:00:00-05:00", "2024-12-06T16:00:00-05:00"]
+  tz: America/New_York
+  values: [1000.0, 1030.0, 1040.0, 1035.0, 1045.0]
+  classes: [regular, regular, regular, regular]
+  warns:
+    - {match: "BBB.*2024-12-03|2024-12-03.*BBB"}
+tolerance: {abs: 1.0e-9}  # values; labels and classes exact

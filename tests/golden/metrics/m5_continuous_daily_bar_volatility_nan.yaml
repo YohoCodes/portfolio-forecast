@@ -1,0 +1,23 @@
+# M5, U3: continuous daily data (Delta = 1 day, daily by U3) gives Bar
+# Volatility NaN, like daily data on a calendar; Gap Volatility is NaN too.
+#
+# Derivation
+# 1. calendar=None. Marks 00:00 UTC on 2024-11-30, 12-01, 12-02, 12-03:
+#    values 100, 102, 100.98, 102.9996 (those of m1_continuous_daily_input).
+#    Delta = 1 day: daily (U3: "MC1 daily iff Delta = 1 day").
+# 2. M5: "NaN on daily data": Bar Volatility NaN. Gap Volatility NaN (no gaps
+#    in continuous mode, U3).
+rule: [M5, U3]
+kind: performance_report
+inputs:
+  calendar: null
+  labels: ["2024-11-30T00:00:00+00:00", "2024-12-01T00:00:00+00:00",
+           "2024-12-02T00:00:00+00:00", "2024-12-03T00:00:00+00:00"]
+  labels_tz: UTC
+  values: [100.0, 102.0, 100.98, 102.9996]
+  cagr_clock: calendar
+expected:
+  report:
+    Bar Volatility: .nan
+    Gap Volatility: .nan
+tolerance: {abs: 1.0e-12}

@@ -1,0 +1,54 @@
+# B5: adjusted prices on hourly bars. Each open is put on the adjusted basis
+# with its own bar's factor f = AdjC/C, so the fill uses an adjusted open and
+# the ex-date's dividend lands in the gap.
+#
+# Derivation
+# 1. Calendar (XNYS, EST UTC-05:00): 2024-11-29 half-day 09:30-13:00;
+#    2024-12-02 (Mon) 09:30-16:00. Hourly bars on :30.
+# 2. AAA only (weight 1), br0 = 980, fill="open". A dividend of 2 goes ex on
+#    12-02; the last raw close before it is 100, so bars before the ex-date
+#    carry the factor f = 1 - 2/100 = 0.98, bars from the ex-date f = 1.
+#            11-29                          12-02
+#    bar     09:30  10:30  11:30  12:30     09:30
+#    O       100    101    102    101        99
+#    C       101    102    101    100       100
+#    AdjC     98.98  99.96  98.98  98       100
+#    f = AdjC/C: 0.98 on 11-29 (98.98/101 = 0.98, ...), 1 on 12-02.
+# 3. B5: O' = O f. Closes are the adjusted closes (get_closing_prices
+#    prefers them).
+#    - fill: O'_{1,1} = 100 * 0.98 = 98, so n = 980/98 = 10
+#    - 12-02 open: O' = 99 * 1 = 99
+# 4. Values (V = 10 P):
+#    - 11-29 09:30 (fill)       980
+#    - 11-29 10:30, 11:30, 12:30, 13:00: 10 AdjC = 989.8, 999.6, 989.8, 980
+#    - 12-02 09:30 (open mark)  990
+#    - 12-02 10:30              1000
+# 5. Gap: g = 990/980 - 1 = 1/98 = +1.0204%: the raw price fell 100 -> 99
+#    (-1%), but with the dividend of 2 the holder gained 1/98. The dividend is
+#    in g, not in a bar return (B5).
+# 6. Classes: 11-29 bars regular x 4; 12-02 09:30 gap; 10:30 regular.
+rule: [B5, B1.4]
+kind: simulate_buy_and_hold
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+         "2024-11-29T12:30:00-05:00", "2024-12-02T09:30:00-05:00"]
+  bars_tz: America/New_York
+  prices:
+    Open:
+      AAA: [100.0, 101.0, 102.0, 101.0, 99.0]
+    Close:
+      AAA: [101.0, 102.0, 101.0, 100.0, 100.0]
+    Adj Close:
+      AAA: [98.98, 99.96, 98.98, 98.0, 100.0]
+  w: {AAA: 1.0}
+  br0: 980
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T11:30:00-05:00",
+           "2024-11-29T12:30:00-05:00", "2024-11-29T13:00:00-05:00",
+           "2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00"]
+  tz: America/New_York
+  values: [980.0, 989.8, 999.6, 989.8, 980.0, 990.0, 1000.0]
+  classes: [regular, regular, regular, regular, gap, regular]
+  warns: []
+tolerance: {abs: 1.0e-9, rel: 1.0e-12}  # values (98.98 etc. are not exact in binary); labels and classes exact

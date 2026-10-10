@@ -1,0 +1,24 @@
+# B6: an in-progress hourly bar is dropped, without a warning, under an
+# injected clock.
+#
+# Derivation
+# 1. XNYS session on 2024-12-02: 09:30-16:00 EST (UTC-05:00). Bars start on a
+#    :30 hourly grid: 09:30, 10:30, 11:30, 12:30.
+# 2. Their closes (B3): 10:30, 11:30, 12:30, 13:30.
+# 3. now = 2024-12-02 12:45 EST. B6 keeps bar j iff c_j <= now:
+#    - 10:30 <= 12:45 keep
+#    - 11:30 <= 12:45 keep
+#    - 12:30 <= 12:45 keep
+#    - 13:30 >  12:45 drop (the bar is in progress: it started 15 minutes ago)
+# 4. "dropped without a warning": no UserWarning at all.
+rule: [B6]
+kind: completed_mask
+inputs:
+  index: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00",
+          "2024-12-02T11:30:00-05:00", "2024-12-02T12:30:00-05:00"]
+  index_tz: America/New_York
+  now: "2024-12-02T12:45:00-05:00"
+expected:
+  mask: [true, true, true, false]
+  warns: []
+tolerance: 0  # booleans, compared exactly

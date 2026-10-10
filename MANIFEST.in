@@ -1,0 +1,4 @@
+graft tests
+include CHANGELOG.md CONTRIBUTING.md
+prune demos
+global-exclude __pycache__ *.py[co]

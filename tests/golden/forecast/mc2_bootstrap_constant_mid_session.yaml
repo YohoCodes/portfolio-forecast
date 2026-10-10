@@ -1,0 +1,60 @@
+# MC2, MC8, MC3, MC6: bootstrap from an hourly history that ends
+# mid-session, on zero-variance pools. The partial session is the first of
+# sim_length = 2 sessions, so the horizon ends at the next session's close.
+# min_sample = 0 disables the check, so a one-gap pool is accepted (MC6).
+#
+# History (XNYS, EST UTC-05:00; hourly grid on :30, Delta = 1 h), fill="open":
+#   2024-12-02 (session d-1): 09:30 (fill), closes 10:30 ... 15:30, 16:00
+#   2024-12-03 (session d):   09:30 (open mark), closes 10:30, 11:30, 12:30;
+#   the history ends at 12:30, mid-session.
+#   Log returns: full bars m = 0.002, the short 15:30-16:00 bar (rho 1/2)
+#   m/2 = 0.001, the 12-03 gap g = -0.01. Values 100 exp(sum l).
+#   Classes inferred: one gap (12-03 09:30), ten regular returns.
+#
+# Derivation
+# 1. Pools: gap {g} (n = 1); regular: 9 full bars and 1 short bar.
+#    MC3: m_hat = (9 m + m/2)/(9 + 1/2) = m. Normalized l' = m for all ten
+#    (as in mc3_bootstrap_constant_hourly_half_day.yaml, step 1).
+# 2. MC6: n_gap = 1 < 30 would raise at the default; min_sample = 0 disables
+#    the check, and the class is samplable (n = 1 > 0).
+# 3. Layout (MC2): session d's remaining bars come first with no gap,
+#    and d counts as the first of the n = 2 sessions:
+#    - 12-03: 13:30, 14:30, 15:30 regular (rho 1); 16:00 regular (rho 1/2)
+#    - 12-04: 09:30 gap; 10:30 ... 15:30 regular (six); 16:00 regular (1/2)
+#    The horizon ends at C_{d+n-1} = C_{12-04}: 12 marks, 13 columns.
+# 4. Future l: m, m, m, m/2, g, then m x 6, m/2. Cumulative:
+#    0, 0.002, 0.004, 0.006, 0.007, -0.003, -0.001, 0.001, 0.003, 0.005,
+#    0.007, 0.009, 0.010; the path is exp of each (MC4).
+# 5. One UserWarning about sim_length counting sessions (intraday input).
+# Tolerance: relative 1e-10.
+rule: [MC2, MC8, MC3, MC6]
+kind: nonparametric_monte_carlo
+inputs:
+  labels: ["2024-12-02T09:30:00-05:00", "2024-12-02T10:30:00-05:00", "2024-12-02T11:30:00-05:00",
+           "2024-12-02T12:30:00-05:00", "2024-12-02T13:30:00-05:00", "2024-12-02T14:30:00-05:00",
+           "2024-12-02T15:30:00-05:00", "2024-12-02T16:00:00-05:00",
+           "2024-12-03T09:30:00-05:00", "2024-12-03T10:30:00-05:00", "2024-12-03T11:30:00-05:00",
+           "2024-12-03T12:30:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 100.20020013340003, 100.40080106773419, 100.6018036054065, 100.80320855042736,
+           101.00501670841682, 101.2072288866078, 101.30848673598094,
+           100.30045045033772, 100.50125208594012, 100.70245572668487, 100.9040621773868]
+  sim_length: 2
+  n_sims: 3
+  random_state: 1
+  options: {min_sample: 0}
+expected:
+  shape: [3, 13]
+  labels: ["2024-12-03T13:30:00-05:00", "2024-12-03T14:30:00-05:00", "2024-12-03T15:30:00-05:00",
+           "2024-12-03T16:00:00-05:00",
+           "2024-12-04T09:30:00-05:00", "2024-12-04T10:30:00-05:00", "2024-12-04T11:30:00-05:00",
+           "2024-12-04T12:30:00-05:00", "2024-12-04T13:30:00-05:00", "2024-12-04T14:30:00-05:00",
+           "2024-12-04T15:30:00-05:00", "2024-12-04T16:00:00-05:00"]
+  classes: [regular, regular, regular, regular,
+            gap, regular, regular, regular, regular, regular, regular, regular]
+  path: [1.0, 1.0020020013340003, 1.004008010677342, 1.006018036054065, 1.0070245572668486,
+         0.997004495503373, 0.999000499833375, 1.0010005001667084, 1.003004504503377,
+         1.005012520859401, 1.0070245572668486, 1.0090406217738679, 1.010050167084168]
+  warns:
+    - {match: "sim_length"}
+tolerance: {abs: 1.0e-12, rel: 1.0e-10}

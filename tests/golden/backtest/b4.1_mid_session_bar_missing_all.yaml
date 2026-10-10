@@ -1,0 +1,45 @@
+# B4.1: a mid-session bar missing for every held symbol. The bar's row is
+# absent, so its scheduled mark is missing; the return spanning it covers two
+# grid steps (tau = 2 Delta) and is irregular. Both symbols stay fresh.
+#
+# Derivation
+# 1. Calendar: 2024-11-29, XNYS half-day 09:30-13:00 EST (UTC-05:00). The
+#    hourly grid on :30 schedules bars 09:30, 10:30, 11:30, 12:30 (the last one
+#    short, ending at the 13:00 close), so the scheduled marks are the 09:30
+#    open, then 10:30, 11:30, 12:30, 13:00.
+# 2. Data: bars 09:30, 10:30, 12:30 for A and B, both held. The 11:30 bar is
+#    absent for both, so the scheduled 12:30 mark (its close) is missing from
+#    the data for every held symbol.
+# 3. Marks (B1.1, B2, B3, fill="open"): 09:30 (fill, first bar's open), then
+#    each present bar's close: 10:30 (09:30 bar), 11:30 (10:30 bar), 13:00
+#    (12:30 bar, short last bar at the early close). 4 marks, 3 returns.
+# 4. Freshness: each symbol has its own open at 09:30 and its own close at
+#    10:30, 11:30 and 13:00, so both are fresh at every mark.
+# 5. Classes (B4.1):
+#    - 10:30: open to close of the first bar, regular
+#    - 11:30: close to close, regular
+#    - 13:00: from 11:30 to 13:00; its span contains the scheduled 12:30 mark,
+#      missing for every held symbol: irregular (not regular, though both
+#      symbols are fresh at both ends)
+rule: [B4.1, B1.3]
+kind: history_marks
+inputs:
+  bars: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00", "2024-11-29T12:30:00-05:00"]
+  bars_tz: America/New_York
+  opens:
+    A: [100.0, 101.0, 103.0]
+    B: [50.0, 50.5, 51.5]
+  closes:
+    A: [101.0, 102.0, 104.0]
+    B: [50.5, 51.0, 52.0]
+  held: {A: true, B: true}
+  fill: open
+expected:
+  labels: ["2024-11-29T09:30:00-05:00", "2024-11-29T10:30:00-05:00",
+           "2024-11-29T11:30:00-05:00", "2024-11-29T13:00:00-05:00"]
+  tz: America/New_York
+  fresh:
+    A: [true, true, true, true]
+    B: [true, true, true, true]
+  classes: [regular, regular, irregular]
+tolerance: 0  # labels, flags and classes, compared exactly

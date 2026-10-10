@@ -1,0 +1,18 @@
+# MC1: fill="close" daily output, one mark per session at its close, is
+# daily.
+#
+# Derivation
+# 1. Labels (XNYS, EST UTC-05:00): 2024-11-25 16:00, 11-26 16:00, 11-27 16:00,
+#    11-29 13:00 (half-day close).
+# 2. Each session has exactly one mark, at its close; there is no fill mark.
+# 3. MC1: daily.
+rule: [MC1]
+kind: is_daily
+inputs:
+  labels: ["2024-11-25T16:00:00-05:00", "2024-11-26T16:00:00-05:00",
+           "2024-11-27T16:00:00-05:00", "2024-11-29T13:00:00-05:00"]
+  labels_tz: America/New_York
+  values: [100.0, 101.0, 102.0, 101.0]
+expected:
+  value: true
+tolerance: 0  # a boolean
