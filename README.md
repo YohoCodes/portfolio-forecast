@@ -627,7 +627,7 @@ dict:
 | `"Gap Model"`, `"Kappa"`, `"Criterion"` | The settings used |
 | `"BIC"` or `"AIC"` | Score by regime count, under the criterion's name: every count fitted and eligible when `n_regimes=None`, otherwise just `n_regimes` |
 | `"Log Likelihood"` | Log-likelihood of the model used |
-| `"Regimes"` | `DataFrame`, one row per regime from lowest to highest volatility: `Mean` and `Volatility` of the log return per full bar, `Gap Mean` and `Gap Volatility` (under `"regime"` with gaps), `Expected Duration` in marks ($1/(1 - p_{kk})$), and `Current Probability` at the last historical mark |
+| `"Regimes"` | `DataFrame`, one row per regime from lowest to highest volatility: `Mean` and `Volatility` of the log return per full bar, `Gap Mean` and `Gap Volatility` (under `"regime"` with gaps), `Expected Duration` in marks, $1/(1 - p_{kk})$, and `Current Probability` at the last historical mark |
 | `"Transition Matrix"` | `DataFrame` of one-step transition probabilities, row regime to column regime, same order |
 | `"Gap"` | Under `"independent"` with gaps and `bootstrap=False` only: the gap normal's `Mean` and `Volatility` |
 
@@ -789,7 +789,7 @@ calculate_period_returns(values)
 
 Returns between consecutive marks, labelled with the mark where each ends. A
 return across a missing value is measured from the last known value; returns
-after a total loss are $0/0$, undefined, and kept as NaN (the $-100\%$ return
+after a total loss are $0/0$, undefined, and kept as NaN (the −100% return
 itself is kept as $-1$).
 
 **Returns** — `Series`, always one shorter than `values`.
@@ -832,7 +832,7 @@ Compound annual growth rate, $(V_T/V_0)^{1/Y} - 1$.
 
 **Parameters** — `values` (`Series`) portfolio values; `periods_per_year`
 (`float`, optional) marks per year, for the 0.3.0 bar clock
-$Y = (n - 1)/\text{periods\_per\_year}$, ignored when `years` is given;
+$Y = (n - 1)/P$ with $P$ = `periods_per_year`, ignored when `years` is given;
 `years` (`float`, keyword only) the span $Y$, e.g. from
 [`calculate_total_years`](#module-level-functions).
 
@@ -848,8 +848,8 @@ calculate_sharpe_ratio(period_returns, periods_per_year=252, risk_free_rate=0.0)
 ```
 
 Annualized Sharpe ratio of session returns:
-$\bar e / \hat\sigma(R) \cdot \sqrt{\text{periods\_per\_year}}$ with
-$e = R - r_f/\text{periods\_per\_year}$ and the sample standard deviation.
+$\bar e / \hat\sigma(R) \cdot \sqrt{P}$ with
+$e = R - r_f/P$, $P$ = `periods_per_year`, and the sample standard deviation.
 
 **Parameters** — `period_returns` (`Series`) session returns, e.g. from
 [`calculate_session_returns`](#calculate_session_returns);
@@ -1299,8 +1299,8 @@ but not re-exported. Their docstrings give the full detail.
 | `history_marks(opens, closes, held, calendar="XNYS", tz=None, fill="open")` | `utils.marks` | The backtest's marks, each symbol's freshness at them, and each return's class |
 | `count_sessions(values, calendar="XNYS")` | `performance.metrics` | The sessions the session clock counts: closes after the first mark, a partial first or last session counted whole. Daily dates need not be sessions. |
 | `calculate_total_years(values, calendar="XNYS", cagr_clock="session")` | `performance.metrics` | Years spanned, $N/252$ or calendar days over 365.25 |
-| `calculate_excess_returns(returns, risk_free_rate=0.0, periods_per_year=252)` | `performance.metrics` | $R - r_f/\text{periods\_per\_year}$ |
-| `calculate_volatility(returns, periods_per_year=252)` | `performance.metrics` | Annualized volatility, $\hat\sigma(R)\sqrt{\text{periods\_per\_year}}$ |
+| `calculate_excess_returns(returns, risk_free_rate=0.0, periods_per_year=252)` | `performance.metrics` | $R - r_f/P$, $P$ = `periods_per_year` |
+| `calculate_volatility(returns, periods_per_year=252)` | `performance.metrics` | Annualized volatility, $\hat\sigma(R)\sqrt{P}$, $P$ = `periods_per_year` |
 | `calculate_downside_deviation(period_returns, periods_per_year=252, risk_free_rate=0.0)` | `performance.metrics` | Per-session downside deviation, $\sqrt{\sum \min(e, 0)^2/n}$ |
 | `calculate_class_volatility(values, classes=None, calendar="XNYS", interval=None)` | `performance.metrics` | `"Gap Volatility"` and `"Bar Volatility"`, per unit, short bars scaled to a full bar |
 
@@ -1458,18 +1458,18 @@ $$
 $$
 
 over the regular returns. Every short historical bar is stretched to a full
-bar before it is used: take away the drift it should have had, $\rho\,\hat m$,
+bar before it is used: take away the drift it should have had, $\rho\thinspace\hat m$,
 scale what is left by $1/\sqrt\rho$ (the volatility ratio from the random
 walk), and add a full bar's drift. Every draw for a short future bar is shrunk
 back the same way in reverse:
 
 $$
-\ell' = \hat m + \frac{\ell - \rho\,\hat m}{\sqrt\rho}
+\ell' = \hat m + \frac{\ell - \rho\thinspace\hat m}{\sqrt\rho}
 \qquad\text{(history, to a full bar)},
 $$
 
 $$
-\ell = \rho\,\hat m + \sqrt\rho\,\big(\ell' - \hat m\big)
+\ell = \rho\thinspace\hat m + \sqrt\rho\thinspace\big(\ell' - \hat m\big)
 \qquad\text{(future, back to the bar's length)}.
 $$
 
@@ -1478,7 +1478,7 @@ The two maps are inverses, and with $\rho = 1$ both leave the return untouched.
 *A worked number.* Take hourly history whose regular drift is
 $\hat m = 0.0002$ (0.02% per full hour), and a 15:30 to 16:00 bar with
 $\ell = -0.006$, so $\rho = 0.5$. Its expected drift is
-$\rho\,\hat m = 0.0001$, so it moved $-0.0061$ away from it. Stretched to a
+$\rho\thinspace\hat m = 0.0001$, so it moved $-0.0061$ away from it. Stretched to a
 full hour,
 
 $$
@@ -1554,7 +1554,7 @@ $$
 
 The $k\ln n$ term charges each extra parameter, so a fatter-tailed family has
 to earn its place with a clearly higher likelihood. A future mark of class $c$
-draws $\ell' \sim f(\cdot\,;\hat\theta_c)$, and a short future bar is shrunk back
+draws $\ell' \sim f(\cdot\thinspace;\hat\theta_c)$, and a short future bar is shrunk back
 by the map above.
 
 **Rules.** [Fitting scale](#mc4-fitting-scale) (fitting on log returns),
@@ -1586,7 +1586,7 @@ Given regime $s$, a mark of class $c$ and length ratio $\rho$ is normal, with
 mean and variance per full unit scaled by $\rho$:
 
 $$
-\ell_t \mid s_t = s \;\sim\; \mathcal N\big(\rho_t\,\mu_{s,c},\ \rho_t\,\sigma^2_{s,c}\big).
+\ell_t \mid s_t = s \thickspace\sim\thickspace \mathcal N\big(\rho_t\thinspace\mu_{s,c},\ \rho_t\thinspace\sigma^2_{s,c}\big).
 $$
 
 So $\rho_t$ enters by scaling the regime's mean and variance down to the
@@ -1608,13 +1608,13 @@ weighted by $\gamma$, and the transition matrix from the expected transition
 counts $\Xi_{ij} = \sum_{t=1}^{T-1} \xi_t(i,j)$:
 
 $$
-\hat\mu_{s,c} = \frac{\sum_{t:\,c_t=c} \gamma_t(s)\,\ell_t}{\sum_{t:\,c_t=c} \gamma_t(s)\,\rho_t},
+\hat\mu_{s,c} = \frac{\sum_{t:\thinspace c_t=c} \gamma_t(s)\thinspace\ell_t}{\sum_{t:\thinspace c_t=c} \gamma_t(s)\thinspace\rho_t},
 \qquad
-\hat\sigma^2_{s,c} = \frac{\sum_{t:\,c_t=c} \gamma_t(s)\,\big(\ell_t - \rho_t\hat\mu_{s,c}\big)^2/\rho_t}{\sum_{t:\,c_t=c} \gamma_t(s)},
+\hat\sigma^2_{s,c} = \frac{\sum_{t:\thinspace c_t=c} \gamma_t(s)\thinspace\big(\ell_t - \rho_t\hat\mu_{s,c}\big)^2/\rho_t}{\sum_{t:\thinspace c_t=c} \gamma_t(s)},
 $$
 
 $$
-\hat P_{ij} = \frac{\Xi_{ij} + \kappa\,\mathbb 1[i=j]}{\sum_{j'} \Xi_{ij'} + \kappa},
+\hat P_{ij} = \frac{\Xi_{ij} + \kappa\thinspace\mathbb 1[i=j]}{\sum_{j'} \Xi_{ij'} + \kappa},
 \qquad
 \hat\pi = \gamma_1.
 $$
@@ -1685,13 +1685,13 @@ $$
 M-step. With $N_s = \sum_t \gamma_t(s)$, so $N_1 = 2.427$ and $N_2 = 2.573$:
 
 $$
-\hat\mu_1 = \frac{\sum_t \gamma_t(1)\,\ell_t}{N_1} = \frac{0.02365}{2.427} = 0.009745,
+\hat\mu_1 = \frac{\sum_t \gamma_t(1)\thinspace\ell_t}{N_1} = \frac{0.02365}{2.427} = 0.009745,
 \qquad
 \hat\mu_2 = \frac{-0.03365}{2.573} = -0.01308,
 $$
 
 $$
-\hat\sigma^2_1 = \frac{\sum_t \gamma_t(1)\,(\ell_t - \hat\mu_1)^2}{N_1} = \frac{0.0001044}{2.427} = 4.303 \times 10^{-5},
+\hat\sigma^2_1 = \frac{\sum_t \gamma_t(1)\thinspace(\ell_t - \hat\mu_1)^2}{N_1} = \frac{0.0001044}{2.427} = 4.303 \times 10^{-5},
 \qquad
 \hat\sigma^2_2 = \frac{0.0009829}{2.573} = 3.820 \times 10^{-4},
 $$
@@ -1788,7 +1788,7 @@ gap, then 7 bars), 7 under `"independent"`.
 
 A sticky prior on staying in a regime: each row of $P$ has prior
 $\text{Dir}(1,\dots,1+\kappa,\dots,1)$, and the fit is the MAP estimate,
-$\hat P_{ij} \propto \Xi_{ij} + \kappa\,\mathbb 1[i=j]$, where $\Xi_{ij}$ is the
+$\hat P_{ij} \propto \Xi_{ij} + \kappa\thinspace\mathbb 1[i=j]$, where $\Xi_{ij}$ is the
 expected number of $i \to j$ transitions. It is a point estimate, not a
 posterior. $\kappa = 0$ is exactly the maximum-likelihood fit. Expected
 duration becomes
@@ -1869,7 +1869,7 @@ disables the count check.
   disables the check)"*
 - **Regime-switching, `gap_model="regime"` with gaps:** per regime, the
   expected number of gap marks in it,
-  $\sum_{t:\,c_t=\text{gap}} \gamma_t(s) \ge$ `min_sample`. With `bootstrap=True`
+  $\sum_{t:\thinspace c_t=\text{gap}} \gamma_t(s) \ge$ `min_sample`. With `bootstrap=True`
   it counts the gaps whose most likely regime is $s$, and a regime with no
   gaps to resample always fails.
 - **Regime-switching otherwise** (`"independent"`, or one class): the per-class
@@ -1971,7 +1971,7 @@ $\ell = \ln(1+r)$.
 | $c_j$ | The close time of bar $j$. | Timestamp | derived (index of `data` on `calendar`) |
 | $\text{now}$ | The current time; a bar that closes after it is in progress. | Timestamp | `now` |
 
-Conventions: $\sum$ is a sum and $\{\dots\}$ a set; square brackets around two
+Conventions: $\sum$ is a sum and $\lbrace\dots\rbrace$ a set; square brackets around two
 times are the closed interval between them. A prime on a price marks it
 adjusted.
 
@@ -2033,7 +2033,7 @@ Cases: `b2_fill_close_daily.yaml`, `b2_fill_open_daily.yaml`, `b2_fill_open_hour
 Every label is a tz-aware timestamp on the exchange clock: the fill at the open
 or close it fills, each open mark at its bar's start, each other value at its
 bar's close (the session close on a half-day or for a short last bar). Bar $j$
-maps to its session span $\{s_\text{first},\dots,s_\text{last}\}$: an open fill
+maps to its session span $\lbrace s_\text{first},\dots,s_\text{last}\rbrace$: an open fill
 at $s_\text{first}$'s open, each value at $s_\text{last}$'s close, so every bar size
 is supported and `fill="open"` works on weekly and longer bars.
 
@@ -2076,7 +2076,7 @@ Cases: `b4.4_backtest_daily_bar_on_holiday_raises.yaml`, `b4.4_backtest_extended
 #### B5 Adjusted prices
 
 Each open is put on the adjusted basis by its own bar's factor:
-$O'_{d,1} = O_{d,1} f_d$ with $f_d = \text{AdjC}_d / C_d$, so a dividend lands in the gap.
+$O^\prime_{d,1} = O_{d,1} f_d$ with $f_d = \text{AdjC}_d / C_d$, so a dividend lands in the gap.
 
 Cases: `b5_dividend_lands_in_gap.yaml`.
 
@@ -2135,7 +2135,7 @@ return spanning it irregular, with a warning naming `calendar="24/5"` when more
 than 10% of returns are irregular. Daily iff $\Delta = 1$ day; future marks
 $t_T + k\Delta$; risk figures on returns between the last marks at or before
 each 00:00 UTC, annualized with 365 (bars longer than a day: their own returns
-with $365\,\text{d}/\Delta$); $\Delta \ge 1$ d keeps every bar return under both
+with $365\thinspace\text{d}/\Delta$); $\Delta \ge 1$ d keeps every bar return under both
 fills, $\Delta < 1$ d always excludes the first UTC day; $r_f/365$, calendar
 clock only, years bounded at 00:00 UTC on 1 January; fewer than two 00:00 UTC
 boundaries give NaN volatility, Sharpe and Sortino with a warning (M12); the
@@ -2155,7 +2155,7 @@ Cases: `u3_backtest_continuous_fill_close.yaml`, `u3_backtest_continuous_fill_op
 | $r_{d,k}$ | The simple return of regular bar $k$ of session $d$. | Fraction | derived |
 | $k$ | A regular bar of session $d$. | 1, 2, … | data |
 | $R_t$ | In continuous mode, the return of UTC day $t$. | Fraction | derived |
-| $t$ | In M1, a UTC day ($R_t$, $D_t$). In M4, $t_0$ and $t_T$ are the times of the first and last marks. In M6, a mark ($V(t)$). | Day (M1); timestamp (M4, M6) | data (labels of `values`) |
+| $t$ | In M1, a UTC day ($R_t$, $D_t$). In M4, $t_0$ and $t_T$ are the times of the first and last marks. In M6, a mark, as in $V(t)$. | Day (M1); timestamp (M4, M6) | data (labels of `values`) |
 | $V$ | The portfolio value, at a mark or time; $V_0$ at the first mark and $V_T$ at the last. | As `values` | data (`values`) |
 | $D_t$ | The last mark at or before the 00:00 UTC that starts day $t$. | Timestamp | derived |
 | $r_f$ | The annual risk-free rate. | Fraction per year | `risk_free_rate` |
@@ -2213,7 +2213,7 @@ Cases: `m3_risk_free_rate_daily.yaml`.
 
 $\text{CAGR} = (V_T/V_0)^{1/Y} - 1$ with $Y = N/252$, $N$ the sessions after the
 fill, a partial first or last session counting whole (`cagr_clock="session"`,
-default), or $Y = (t_T - t_0)/365.25\,\text{days}$
+default), or $Y = (t_T - t_0)/365.25\thinspace\text{days}$
 (`"calendar"`); Total Years follows the same clock, and `statistical_report`
 needs `dates` for `"calendar"`.
 
@@ -2259,7 +2259,7 @@ Cases: `m8_continuous_year_bounded_at_utc_new_year.yaml`, `m8_partial_first_year
 
 #### M9 Total loss
 
-At $V_T = 0$, $\text{CAGR} = -100\%$; returns after ruin ($0/0$) are excluded from
+At $V_T = 0$, $\text{CAGR} = -1$ (−100%); returns after ruin ($0/0$) are excluded from
 every risk figure (the return helpers keep them as NaN rows, M10), and
 ruined paths stay in `statistical_report` summaries with a warning.
 
@@ -2307,7 +2307,7 @@ Cases: `m12_continuous_one_day_boundary.yaml`, `m12_single_mark_raises.yaml`, `m
 | $N_{s,c}$ | The expected number of marks of class $c$ in regime $s$. | Expected count | fitted |
 | $T$ | The number of marks the chain runs on, as in $\ell_{1:T}$ and $t = 1, \dots, T-1$; $s_T$ is the regime at the last historical mark. | Count | data |
 
-Conventions: as in [Notation](#notation), plus: $\#\{\dots\}$ is the number of
+Conventions: as in [Notation](#notation), plus: $\lvert\lbrace \dots\rbrace\rvert$ is the number of
 elements of a set and $\max$ the largest; $\text{gap}$ and $\text{reg}$ name
 the gap and regular classes.
 
@@ -2341,8 +2341,8 @@ Cases: `mc2_bootstrap_constant_mid_session.yaml`, `mc2_daily_history.yaml`, `mc2
 Gap marks draw $\ell$ from the gap pool and regular marks $\ell'$ from the regular
 pool, i.i.d. within class; irregular returns are in neither pool. Short bars use a
 location–scale map with $\rho = \frac{\tau}{\Delta}$ and $\hat m = \frac{\sum_t \ell_t}{\sum_t \rho_t}$ over
-regular returns: history $\ell' = \hat m + \frac{\ell - \rho\,\hat m}{\sqrt\rho}$, future
-$\ell = \rho\,\hat m + \sqrt\rho\,\big(\ell' - \hat m\big)$, so drift scales with $\rho$ and
+regular returns: history $\ell' = \hat m + \frac{\ell - \rho\thinspace\hat m}{\sqrt\rho}$, future
+$\ell = \rho\thinspace\hat m + \sqrt\rho\thinspace\big(\ell' - \hat m\big)$, so drift scales with $\rho$ and
 volatility with $\sqrt\rho$.
 
 Cases: `mc3_bootstrap_class_moments.yaml`, `mc3_bootstrap_constant_daily.yaml`, `mc3_bootstrap_constant_hourly_half_day.yaml`, `mc3_bootstrap_irregular_excluded.yaml`.
@@ -2377,11 +2377,11 @@ count check below, but never the two that always raise.
   and the history has no returns of ($n_c = 0$); for parametric, $n_c < k$ for
   the class's $k$-parameter family.
 - **HMM, `gap_model="regime"` with gaps.** Only each regime's gap occupancy is
-  checked: for every regime $s$, $\sum_{t:\,c_t=\text{gap}} \gamma_t(s) \ge$
+  checked: for every regime $s$, $\sum_{t:\thinspace c_t=\text{gap}} \gamma_t(s) \ge$
   `min_sample` ($\gamma$ of MC7), or with `bootstrap=True` the hard count
-  $\#\{t: c_t = \text{gap},\ \arg\max_{s'} \gamma_t(s') = s\} \ge$ `min_sample`.
+  $\lvert\lbrace t: c_t = \text{gap},\ \arg\max_{s'} \gamma_t(s') = s\rbrace\rvert \ge$ `min_sample`.
   Regular cells get no `min_sample` check, only the start rule of MC7
-  (expected occupancy at least $\max(2,\ 0.01\,n_c)$ of the class's marks).
+  (expected occupancy at least $\max(2,\ 0.01\thinspace n_c)$ of the class's marks).
 - **HMM, `gap_model="independent"`, or one class** (daily, continuous, or
   intraday without gaps) under either `gap_model`: the per-class rule,
   $n_c \ge$ `min_sample`, checked once before any regime count is fitted and
@@ -2400,7 +2400,7 @@ Cases: `mc6_bootstrap_empty_gap_pool_raises.yaml`, `mc6_bootstrap_gap_below_min_
 `regime_switching_monte_carlo` fits a Gaussian hidden Markov model to the kept
 log returns $\ell_t$ (MC4), class $c_t$ known.
 
-- **Chain.** Regimes $s_t \in \{1,\dots,S\}$ with initial distribution $\pi$ and
+- **Chain.** Regimes $s_t \in \lbrace1,\dots,S\rbrace$ with initial distribution $\pi$ and
   one transition matrix $P$, $\Pr\big(s_{t+1} = j \mid s_t = i\big) = P_{ij}$, stepping
   once per mark it runs on: every mark, gaps included, under
   `gap_model="regime"` (default); regular marks only under `"independent"` or
@@ -2408,7 +2408,7 @@ log returns $\ell_t$ (MC4), class $c_t$ known.
   matrix.
 - **Emissions.** With $\rho_t = \frac{\tau_t}{\Delta}$ for a regular mark and
   $\rho_t = 1$ for a gap (and in continuous mode),
-  $\ell_t \mid s_t = s \;\sim\; \mathcal N\big(\rho_t\,\mu_{s,c},\ \rho_t\,\sigma^2_{s,c}\big)$ for a mark of class $c$;
+  $\ell_t \mid s_t = s \thickspace\sim\thickspace \mathcal N\big(\rho_t\thinspace\mu_{s,c},\ \rho_t\thinspace\sigma^2_{s,c}\big)$ for a mark of class $c$;
   $\mu_{s,c}$, $\sigma^2_{s,c}$ are per full unit and the history is not
   pre-normalized. Under `"independent"` gaps ignore the regime: with
   `bootstrap=False` one normal $\mathcal N(\mu_\text{gap}, \sigma^2_\text{gap})$,
@@ -2420,17 +2420,17 @@ log returns $\ell_t$ (MC4), class $c_t$ known.
   estimate, not a posterior; $\kappa = 0$ is exactly the MLE.
 - **EM.** The E-step (scaled forward–backward) gives $\gamma_t(s) = \Pr\big(s_t = s \mid \ell_{1:T}\big)$
   and $\xi_t(i,j) = \Pr\big(s_t = i,\ s_{t+1} = j \mid \ell_{1:T}\big)$. With
-  $N_{s,c} = \sum_{t:\,c_t=c} \gamma_t(s)$ and $\Xi_{ij} = \sum_{t=1}^{T-1} \xi_t(i,j)$
+  $N_{s,c} = \sum_{t:\thinspace c_t=c} \gamma_t(s)$ and $\Xi_{ij} = \sum_{t=1}^{T-1} \xi_t(i,j)$
   the M-step is
-  $\hat\mu_{s,c} = \frac{\sum_{t:\,c_t=c} \gamma_t(s)\,\ell_t}{\sum_{t:\,c_t=c} \gamma_t(s)\,\rho_t}$,
-  $\hat\sigma^2_{s,c} = \max\big(\sum_{t:\,c_t=c} \gamma_t(s)(\ell_t - \rho_t\hat\mu_{s,c})^2/\rho_t \big/ N_{s,c},\ 10^{-12}\big)$,
-  $\hat P_{ij} = \frac{\Xi_{ij} + \kappa\,\mathbb 1[i=j]}{\sum_{j'} \Xi_{ij'} + \kappa}$,
+  $\hat\mu_{s,c} = \frac{\sum_{t:\thinspace c_t=c} \gamma_t(s)\thinspace\ell_t}{\sum_{t:\thinspace c_t=c} \gamma_t(s)\thinspace\rho_t}$,
+  $\hat\sigma^2_{s,c} = \max\big(\sum_{t:\thinspace c_t=c} \gamma_t(s)(\ell_t - \rho_t\hat\mu_{s,c})^2/\rho_t \big/ N_{s,c},\ 10^{-12}\big)$,
+  $\hat P_{ij} = \frac{\Xi_{ij} + \kappa\thinspace\mathbb 1[i=j]}{\sum_{j'} \Xi_{ij'} + \kappa}$,
   $\hat\pi = \gamma_1$; with every $\rho_t = 1$ these are the plain Gaussian HMM
   updates. EM stops when $J$ rises by less than $10^{-6}$ or after 1000 iterations.
 - **Starts.** `n_starts` (default 10) random starts: means seeded k-means++
   style on $\ell$ per class, variances at the class variance, $\pi$ and $P$
   uniform; the highest $\log L$ is kept. A start is rejected if anything is
-  non-finite, if any cell has $N_{s,c} < \max(2,\ 0.01\,n_c)$, or if any
+  non-finite, if any cell has $N_{s,c} < \max(2,\ 0.01\thinspace n_c)$, or if any
   $\hat\sigma^2_{s,c}$ is at the floor $10^{-12}$. A count $S$ cannot be fitted if
   a class on the chain has $n_c < 2S$, if $n < k$, or if every start is rejected.
 - **Parameters and criterion.** $k = (S-1) + S(S-1)$ plus $2S$ emission
@@ -2449,10 +2449,10 @@ log returns $\ell_t$ (MC4), class $c_t$ known.
   the last historical mark and steps by $P$ once per future mark the chain runs
   on. A mark of class $c$ in regime $s$ draws from
   $\mathcal N(\mu_{s,c}, \sigma^2_{s,c})$ (`bootstrap=False`) or from the history's
-  class-$c$ returns whose most likely regime $\arg\max_s \gamma_t(s)$ is $s$
+  returns of class $c$ whose most likely regime $\arg\max_s \gamma_t(s)$ is $s$
   (`bootstrap=True`, regular returns per full unit,
-  $\ell' = \mu_{s,\text{reg}} + \frac{\ell - \rho\,\mu_{s,\text{reg}}}{\sqrt\rho}$); a short future
-  bar maps by $\ell = \rho\,\mu_{s,\text{reg}} + \sqrt\rho\,\big(\ell' - \mu_{s,\text{reg}}\big)$.
+  $\ell' = \mu_{s,\text{reg}} + \frac{\ell - \rho\thinspace\mu_{s,\text{reg}}}{\sqrt\rho}$); a short future
+  bar maps by $\ell = \rho\thinspace\mu_{s,\text{reg}} + \sqrt\rho\thinspace\big(\ell' - \mu_{s,\text{reg}}\big)$.
 - **Tuning.** More regimes and `"regime"` gap emissions need more data per cell;
   `min_sample` refuses counts whose regimes see too few gaps; BIC prefers
   fewer regimes than AIC on long histories; larger `kappa` gives longer-lived

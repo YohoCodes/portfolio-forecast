@@ -107,10 +107,10 @@ Migrating from 0.3.0, one line per breaking change (old → new):
   `classes` are the future marks from `next_trading_dates`; `None` for a
   plain array.
 - The simulators model two return classes: each future gap mark draws from the gaps (last close to next open), each bar from the
-  bars, and irregular returns are left out. A short bar ($\rho = \tau/\Delta
-  < 1$, e.g. a half-day's last bar) is rescaled by location and scale:
+  bars, and irregular returns are left out. A short bar
+  ($\rho = \tau/\Delta < 1$, e.g. a half-day's last bar) is rescaled by location and scale:
   history $\ell' = \hat m + (\ell - \rho\hat m)/\sqrt\rho$, future
-  $\ell = \rho\hat m + \sqrt\rho\,(\ell' - \hat m)$, with
+  $\ell = \rho\hat m + \sqrt\rho\thinspace(\ell' - \hat m)$, with
   $\hat m = \sum_k \ell_k / \sum_k \rho_k$ over the bars (the regime's own
   mean in the HMM). Daily histories are one class, as before.
 - On intraday history the simulators' `sim_length` counts sessions, not
