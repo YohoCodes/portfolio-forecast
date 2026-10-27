@@ -284,9 +284,12 @@ Default, Description), then **Returns**, **Raises**, **Notes** and
 
 ## Demo notebooks
 
-The demo notebooks live in `demos/`, named `NN_topic.ipynb` with a
-two-digit number giving the reading order (`01_quick_start_daily.ipynb`).
-They share one layout, so follow it in a new demo:
+The demo notebooks live in their own repository,
+[portfolio-forecast-demos](https://github.com/YohoCodes/portfolio-forecast-demos),
+and run against the release on PyPI, so changes to them go there. They are
+named `NN_topic.ipynb` with a two-digit number giving the reading order
+(`01_quick_start_daily.ipynb`). They share one layout, so follow it in a new
+demo:
 
 - A title cell, `# **Portfolio Forecast Demo: <Topic>**`, with a sentence on
   what the demo does and a numbered list of its steps.
@@ -296,8 +299,11 @@ They share one layout, so follow it in a new demo:
   does or why.
 - Single-quoted strings, and seeds passed as
   `random_state=np.random.default_rng(42)`.
+- Links to this README use the release tag the notebooks run against, e.g.
+  `https://github.com/YohoCodes/portfolio-forecast/blob/v0.4.0/README.md#concepts`,
+  so the anchors match the installed version.
 - Commit the notebook with its outputs, run top to bottom, and with no empty
-  trailing cells. Ruff checks notebooks too.
+  trailing cells.
 
 ## Changing a public signature
 

@@ -240,47 +240,46 @@ daily_sims = nonparametric_monte_carlo(to_session_values(backtest), sim_length=5
 
 ## Demos
 
-Three Jupyter notebooks in the `demos/` folder work through complete
-examples. The first two download recent prices from Yahoo Finance, over a
-window that ends today, so their numbers change from run to run; the third
-generates its own synthetic history.
+Three Jupyter notebooks work through complete examples. They live in their
+own repository,
+[portfolio-forecast-demos](https://github.com/YohoCodes/portfolio-forecast-demos),
+and run against the release on PyPI. The first two download recent prices
+from Yahoo Finance, over a window that ends today, so their numbers change
+from run to run; the third generates its own synthetic history.
 
 | Notebook | What it does |
 | --- | --- |
-| `demos/01_quick_start_daily.ipynb` | Quick start on daily prices: backtests a four-stock portfolio with [`simulate_buy_and_hold`](#simulate_buy_and_hold), forecasts it with all three simulators, compares their fan charts and statistical reports, and compiles a PDF report with [`compile_statistical_reports`](#compile_statistical_reports) |
-| `demos/02_intraday_sessions_and_gaps.ipynb` | Intraday sessions and gaps on hourly bars: the marks of a session, [return classes](#return-classes) and their warnings, gap and bar volatility, future marks across a weekend and a half-day, a forecast counted in sessions, [`to_session_values`](#to_session_values), and continuous mode for a 24/7 asset |
-| `demos/03_choosing_a_simulator.ipynb` | Choosing a simulator, on a synthetic two-regime history whose true model is known, so each method can be checked against the truth |
+| `01_quick_start_daily.ipynb` | Quick start on daily prices: backtests a four-stock portfolio with [`simulate_buy_and_hold`](#simulate_buy_and_hold), forecasts it with all three simulators, compares their fan charts and statistical reports, and compiles a PDF report with [`compile_statistical_reports`](#compile_statistical_reports) |
+| `02_intraday_sessions_and_gaps.ipynb` | Intraday sessions and gaps on hourly bars: the marks of a session, [return classes](#return-classes) and their warnings, gap and bar volatility, future marks across a weekend and a half-day, a forecast counted in sessions, [`to_session_values`](#to_session_values), and continuous mode for a 24/7 asset |
+| `03_choosing_a_simulator.ipynb` | Choosing a simulator, on a synthetic two-regime history whose true model is known, so each method can be checked against the truth |
 
 To read them without installing anything, open them on
-[GitHub](https://github.com/YohoCodes/portfolio-forecast), which shows the
-saved outputs.
+[GitHub](https://github.com/YohoCodes/portfolio-forecast-demos), which shows
+the saved outputs.
 
 ### Installing the demos
 
-The notebooks are not part of the `pip install` package, so get them from the
-repository.
-
-1. Clone the repository and create a virtual environment:
+1. Clone the demos repository and create a virtual environment:
 
    ```bash
-   git clone https://github.com/YohoCodes/portfolio-forecast.git
-   cd portfolio-forecast
+   git clone https://github.com/YohoCodes/portfolio-forecast-demos.git
+   cd portfolio-forecast-demos
    python -m venv venv
    source venv/bin/activate        # Windows: venv\Scripts\activate
    ```
 
-2. Install the package with the `notebook` extra, which adds `yfinance` to
-   download prices and `ipykernel` to run the notebooks:
+2. Install the requirements: this package from PyPI with the `notebook` extra,
+   which adds `yfinance` to download prices and `ipykernel` to run the
+   notebooks, plus JupyterLab:
 
    ```bash
-   pip install -e ".[notebook]"
+   pip install -r requirements.txt
    ```
 
-3. Open a demo. The extra doesn't include Jupyter itself; to use JupyterLab:
+3. Open a demo:
 
    ```bash
-   pip install jupyterlab
-   jupyter lab demos/01_quick_start_daily.ipynb
+   jupyter lab 01_quick_start_daily.ipynb
    ```
 
    In VS Code, open the notebook and select the `venv` Python as its kernel.
@@ -288,7 +287,7 @@ repository.
 4. Run all cells. The first two demos need internet access to download
    prices, and the last step of `01_quick_start_daily.ipynb` needs LaTeX (see
    [Installation](#installation)); without it, that cell says so and skips the
-   PDF. The PDF is saved to `demos/Reporting/`.
+   PDF. The PDF is saved to `Reporting/`.
 
 ---
 
@@ -316,9 +315,6 @@ package.
 | `src/portfolio_forecast/utils/periods.py` | [`PERIODS_PER_YEAR`](#periods_per_year) and parsing of every [`interval`](#interval) spelling |
 | `src/portfolio_forecast/utils/bar_times.py` | Old location of `close_times`, kept so 0.3.0 imports work |
 | `tests/` | `pytest` suite covering every subpackage; `tests/golden/` holds hand-derived cases for each [Logic](#logic) rule |
-| `demos/01_quick_start_daily.ipynb` | Worked example: a daily quick start, from a portfolio backtest through the three simulators to a PDF report |
-| `demos/02_intraday_sessions_and_gaps.ipynb` | Worked example: hourly sessions, gaps, return classes, future marks and continuous mode |
-| `demos/03_choosing_a_simulator.ipynb` | Worked example: choosing a simulator on a synthetic two-regime history with a known truth |
 | `CONTRIBUTING.md` | How to set up, the code and docstring conventions, and what a pull request needs |
 | `CHANGELOG.md` | Notable changes in each release, with a migration list for 0.4.0 |
 
