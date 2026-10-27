@@ -32,7 +32,7 @@ is left pending (R2). A new case named after a rule goes on that rule's `Cases:`
 | `kind` | Which interface callable the runner calls (table below). |
 | `inputs` | Arguments, in plain YAML. Missing prices are `null`. |
 | `expected` | What the callable must return, plus the optional `warns` and `raises` checks below. |
-| `tolerance` | For numbers: a number (absolute tolerance) or `{abs: ..., rel: ...}`; a number passes if $\lvert a - e \rvert \le \text{abs} + \text{rel}\,\lvert e \rvert$. Labels, classes, flags and counts are always compared exactly; label-only cases use `tolerance: 0`. |
+| `tolerance` | For numbers: a number (absolute tolerance) or `{abs: ..., rel: ...}`; a number passes if $\lvert a - e \rvert \le \text{abs} + \text{rel}\thinspace\lvert e \rvert$. Labels, classes, flags and counts are always compared exactly; label-only cases use `tolerance: 0`. |
 
 **Timestamps.** Write them as ISO strings. With a UTC offset
 (`"2024-11-29T13:00:00-05:00"`) they are instants: inputs are converted to the
@@ -94,7 +94,7 @@ population each class is drawn from is known exactly:
   (`start`, `bars`, `grid`) or `array` (`returns`), with a `seed`;
 - per class, `{mean, sd}` (normal), `{mean, sd, df}` (Student's $t$, `sd` the
   scale), `{constant: x}`, or for `regular` `{regimes: {P, means, sds}}`; a
-  regular bar of ratio $\rho$ gets $\rho\,\text{mean} + \sqrt\rho\,\text{sd}\,z$
+  regular bar of ratio $\rho$ gets $\rho\thinspace\text{mean} + \sqrt\rho\thinspace\text{sd}\thinspace z$
   (the location–scale map of MC3); `pass_classes: true` passes the classes instead of letting
   the simulator infer them.
 
