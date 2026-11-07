@@ -1,6 +1,7 @@
 import contextlib
 import io
 import warnings
+from zoneinfo import ZoneInfo
 
 import exchange_calendars as xcals
 import numpy as np
@@ -228,7 +229,7 @@ class TestStatisticalReport:
 
 
 def ny(text):
-    return pd.Timestamp(text, tz=NY)
+    return pd.Timestamp(text, tz=ZoneInfo(NY))
 
 
 def hourly_ohlc(days, seed=3):

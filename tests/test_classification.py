@@ -1,4 +1,6 @@
 """Daily detection, classify_returns and to_session_values (MC1)."""
+from zoneinfo import ZoneInfo
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,7 +13,7 @@ NY = "America/New_York"
 
 
 def ny(text):
-    return pd.Timestamp(text, tz=NY)
+    return pd.Timestamp(text, tz=ZoneInfo(NY))
 
 
 def series(labels):

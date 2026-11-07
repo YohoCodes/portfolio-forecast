@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 import exchange_calendars as xcals
 import numpy as np
 import pandas as pd
@@ -12,7 +14,7 @@ NY = "America/New_York"
 
 
 def ny(text):
-    return pd.Timestamp(text, tz=NY)
+    return pd.Timestamp(text, tz=ZoneInfo(NY))
 
 
 # The first six XNYS sessions of 2025 (the market closed on Thursday 9 January)
@@ -488,6 +490,13 @@ class TestCompletedBars:
     def test_nothing_closed_raises(self, hourly):
         with pytest.raises(ValueError, match="No bar has closed"):
             simulate_buy_and_hold(hourly, [1, 1], now=ny("2025-06-04 09:45"))
+
+    def test_default_now_is_the_clock(self):
+        # Bars in 2099 have not closed by the clock, so nothing is left to value
+        index = pd.DatetimeIndex([ny("2099-06-01 10:00"), ny("2099-06-01 11:00")])
+        data = ohlc(index, {"A": [1.0, 1.0]}, {"A": [1.0, 1.0]})
+        with pytest.raises(ValueError, match=r"No bar has closed by now \(the current time\)"):
+            simulate_buy_and_hold(data, [1.0], tz=NY)
 
 
 class TestContinuousMode:
